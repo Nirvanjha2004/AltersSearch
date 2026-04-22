@@ -1,0 +1,27 @@
+CREATE EXTENSION IF NOT EXISTS vector;
+
+CREATE TABLE IF NOT EXISTS repos (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    repo_name TEXT NOT NULL,
+    description TEXT,
+    url TEXT NOT NULL UNIQUE,
+    domain TEXT NOT NULL,
+    embedding vector(1536),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS ingestion_queue (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    query TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    retry_count INTEGER NOT NULL DEFAULT 0,
+    last_updated TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS search_logs (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    query TEXT NOT NULL,
+    domain TEXT,
+    returned_results_count INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
