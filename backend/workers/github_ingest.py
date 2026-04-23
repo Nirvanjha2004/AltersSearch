@@ -8,7 +8,6 @@ import httpx
 
 
 GITHUB_SEARCH_URL = "https://api.github.com/search/repositories"
-OPENAI_EMBEDDINGS_URL = "https://api.openai.com/v1/embeddings"
 
 
 def _get_supabase_client():
@@ -30,11 +29,20 @@ def _get_supabase_client():
     return create_client(supabase_url, supabase_key)
 
 
-def _get_openai_api_key() -> str:
-    openai_api_key = os.getenv("OPENAI_API_KEY")
-    if not openai_api_key:
-        raise ValueError("OPENAI_API_KEY is required for text-embedding-3-small embeddings.")
-    return openai_api_key
+def _get_embeddings_model():
+    google_api_key = os.getenv("GOOGLE_API_KEY")
+    if not google_api_key:
+        raise ValueError("GOOGLE_API_KEY is required for Gemini embeddings.")
+
+    google_embeddings_class = getattr(
+        importlib.import_module("langchain_google_genai"),
+        "GoogleGenerativeAIEmbeddings",
+    )
+    return google_embeddings_class(
+        model=os.getenv("EMBEDDING_MODEL", "gemini-embedding-001"),
+        google_api_key=google_api_key,
+        output_dimensionality=int(os.getenv("EMBEDDING_DIMENSION", "1536")),
+    )
 
 
 def _infer_domain(query: str, repo: dict[str, Any]) -> str:
@@ -109,39 +117,19 @@ async def _fetch_top_repositories(client: httpx.AsyncClient, query: str, limit: 
     return items[:limit]
 
 
-async def _embed_texts(client: httpx.AsyncClient, texts: list[str]) -> list[list[float]]:
+async def _embed_texts(model, texts: list[str]) -> list[list[float]]:
     if not texts:
         return []
 
-    openai_api_key = _get_openai_api_key()
-    response = await client.post(
-        OPENAI_EMBEDDINGS_URL,
-        headers={
-            "Authorization": f"Bearer {openai_api_key}",
-            "Content-Type": "application/json",
-        },
-        json={
-            "model": os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small"),
-            "input": texts,
-        },
-    )
+    if hasattr(model, "aembed_documents"):
+        vectors = await model.aembed_documents(texts)
+        return [list(map(float, vector)) for vector in vectors]
 
-    if response.status_code >= 400:
-        raise RuntimeError(f"OpenAI embeddings API returned {response.status_code}: {response.text}")
+    if hasattr(model, "embed_documents"):
+        vectors = model.embed_documents(texts)
+        return [list(map(float, vector)) for vector in vectors]
 
-    payload = response.json()
-    data = payload.get("data") if isinstance(payload, dict) else None
-    if not isinstance(data, list):
-        raise RuntimeError("Unexpected OpenAI embeddings response format.")
-
-    vectors: list[list[float]] = []
-    for item in data:
-        embedding = item.get("embedding") if isinstance(item, dict) else None
-        if not isinstance(embedding, list):
-            raise RuntimeError("Missing embedding vector in OpenAI response.")
-        vectors.append([float(v) for v in embedding])
-
-    return vectors
+    raise RuntimeError("No supported embedding method was found on the Gemini embeddings model.")
 
 
 def _build_insert_payload(repo: dict[str, Any], query: str, embedding: list[float]) -> dict[str, Any]:
@@ -165,7 +153,8 @@ async def _ingest_query(supabase, client: httpx.AsyncClient, query: str) -> dict
         fallback = repo.get("full_name") or repo.get("name") or ""
         texts.append((description.strip() or fallback).strip())
 
-    vectors = await _embed_texts(client=client, texts=texts)
+    embeddings_model = _get_embeddings_model()
+    vectors = await _embed_texts(model=embeddings_model, texts=texts)
 
     inserted = 0
     failed = 0
