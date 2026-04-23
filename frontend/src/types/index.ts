@@ -11,7 +11,8 @@ export interface SearchResult {
 }
 
 export interface AgentResponse {
-  status: 'success' | 'needs_clarification';
+  message: string;
+  status: 'success' | 'clarification_needed' | 'error';
   results?: SearchResult[];
   clarification_question?: string;
 }

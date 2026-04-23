@@ -24,7 +24,7 @@ class QueryAssessment(BaseModel):
 
 def _build_llm():
     llm = ChatGroq(
-        model="llama3-8b-8192",
+        model="llama-3.1-8b-instant",
         api_key=os.getenv("GROQ_API_KEY"),
         temperature=0,
     )
@@ -61,13 +61,25 @@ async def process_search_query(request: SearchRequest) -> dict[str, Any]:
 
     messages = [
         SystemMessage(
-            content=(
-                "You are an expert software engineering search gatekeeper. "
-                "Decide whether the user query is clear enough for repository/code search. "
-                "If unclear, set is_clear=false and ask one concise clarification question. "
-                "If clear, set is_clear=true and provide an optimized_query for semantic search."
-            )
-        ),
+    content=(
+        "You are the Intelligence Orchestrator for AltersSearch, a specialized GitHub repository search engine. "
+        "Your primary objective is to evaluate the 'Information Density' of user queries.\n\n"
+        
+        "DETERMINATION RULES:\n"
+        "1. HIGH DENSITY (is_clear=true): The query contains functional requirements, architectural goals, "
+        "or specific technical contexts (even if niche or unknown to you). If you can identify WHAT the software "
+        "should do, proceed to search.\n"
+        
+        "2. LOW DENSITY (is_clear=false): The query is a single term with no context, a greeting, or "
+        "completely lacks actionable intent (e.g., just 'Help', 'Search', or a brand name with no verb).\n\n"
+        
+        "3. OPTIMIZATION: When is_clear=true, your 'optimized_query' must strip out conversational filler "
+        "and expand niche terms into broad semantic descriptors to maximize vector database hit rates.\n\n"
+        
+        "Example: If a user mentions an unknown tool like 'Unsiloed AI' but describes it as 'parsing PDFs to JSON', "
+        "your optimized_query should be 'PDF parser OCR JSON structured data extraction'."
+    )
+    ),
         HumanMessage(content=request.query),
     ]
 
