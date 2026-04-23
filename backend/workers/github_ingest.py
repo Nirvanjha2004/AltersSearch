@@ -4,8 +4,16 @@ import logging
 import os
 import time
 from typing import Any
-
+from dotenv import load_dotenv
+import os
 import httpx
+
+# Ye line .env file se variables read karke os.environ mein daal degi
+load_dotenv() 
+
+# Ab aapka _get_supabase_client() function inhein dhoond payega
+url = os.getenv("SUPABASE_URL")
+key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 
 
 GITHUB_SEARCH_URL = "https://api.github.com/search/repositories"
@@ -43,7 +51,7 @@ def _get_embeddings_model():
         "GoogleGenerativeAIEmbeddings",
     )
     return google_embeddings_class(
-        model="models/text-embedding-004",
+        model="models/gemini-embedding-001",
         google_api_key=google_api_key,
         output_dimensionality=768,
     )
@@ -170,7 +178,7 @@ def _claim_next_job(supabase, max_retries: int) -> dict[str, Any] | None:
     return job
 
 
-def _mark_job_completed(supabase, job_id: int):
+def _mark_job_completed(supabase, job_id: str):
     supabase.table("ingestion_queue").update(
         {
             "status": "completed",
@@ -179,7 +187,7 @@ def _mark_job_completed(supabase, job_id: int):
     ).eq("id", job_id).execute()
 
 
-def _mark_job_failed(supabase, job_id: int, retry_count: int):
+def _mark_job_failed(supabase, job_id: str, retry_count: int):
     supabase.table("ingestion_queue").update(
         {
             "status": "failed",
@@ -189,7 +197,7 @@ def _mark_job_failed(supabase, job_id: int, retry_count: int):
     ).eq("id", job_id).execute()
 
 
-def _mark_job_continue_pagination(supabase, job_id: int, next_page: int):
+def _mark_job_continue_pagination(supabase, job_id: str, next_page: int):
     supabase.table("ingestion_queue").update(
         {
             "status": "pending",
@@ -211,7 +219,7 @@ def _build_embedding_text(repo: dict[str, Any]) -> str:
 
 
 async def _process_job(supabase, client: httpx.AsyncClient, job: dict[str, Any]):
-    job_id = int(job["id"])
+    job_id = str(job["id"])
     query = str(job.get("query") or "").strip()
     retry_count = int(job.get("retry_count") or 0)
     current_page = int(job.get("current_page") or 1)
@@ -259,7 +267,7 @@ async def run_daemon():
                 if job and job.get("id") is not None:
                     _mark_job_failed(
                         supabase=supabase,
-                        job_id=int(job["id"]),
+                        job_id=str(job["id"]),
                         retry_count=int(job.get("retry_count") or 0),
                     )
                 logger.error("Queue item failed with error: %s", exc)
