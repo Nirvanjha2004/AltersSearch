@@ -43,9 +43,9 @@ def _get_embeddings_model():
         "GoogleGenerativeAIEmbeddings",
     )
     return google_embeddings_class(
-        model=os.getenv("EMBEDDING_MODEL", "gemini-embedding-001"),
+        model="models/text-embedding-004",
         google_api_key=google_api_key,
-        output_dimensionality=int(os.getenv("EMBEDDING_DIMENSION", "1536")),
+        output_dimensionality=768,
     )
 
 
