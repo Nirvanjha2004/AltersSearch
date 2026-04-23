@@ -2,8 +2,8 @@ from fastapi import FastAPI
 from fastapi import HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.agent import process_search_query
 from app.logger import logger
+from app.search_pipeline import process_search_query
 from app.schemas import SearchRequest
 
 
