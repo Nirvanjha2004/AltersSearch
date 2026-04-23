@@ -1,6 +1,5 @@
 import asyncio
 import importlib
-import logging
 import os
 import time
 from typing import Any
@@ -17,9 +16,6 @@ key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 
 
 GITHUB_SEARCH_URL = "https://api.github.com/search/repositories"
-
-
-logger = logging.getLogger(__name__)
 
 
 def _get_supabase_client():
@@ -161,6 +157,7 @@ def _claim_next_job(supabase, max_retries: int) -> dict[str, Any] | None:
     )
     rows = response.data or []
     if not rows:
+        logger.debug("No pending ingestion jobs found")
         return None
 
     job = rows[0]
@@ -227,22 +224,42 @@ async def _process_job(supabase, client: httpx.AsyncClient, job: dict[str, Any])
     if not query:
         raise ValueError("query must be a non-empty string")
 
+    logger.info("Processing ingestion job job_id={} query='{}' page={}", job_id, query, current_page)
+
     repos = await _fetch_repositories_page(client=client, query=query, page=current_page, per_page=30)
+    logger.info(
+        "Fetched repositories job_id={} query='{}' page={} count={}",
+        job_id,
+        query,
+        current_page,
+        len(repos),
+    )
+
     texts = [_build_embedding_text(repo) for repo in repos]
     embeddings_model = _get_embeddings_model()
     vectors = await _embed_texts(model=embeddings_model, texts=texts)
 
     for repo, embedding_vector in zip(repos, vectors):
+        repo_name = repo.get("full_name") or repo.get("name") or "unknown"
         url = repo.get("html_url") or ""
         if not url:
+            logger.warning("Skipping repository without URL job_id={} repo_name='{}'", job_id, repo_name)
             continue
         row = _build_insert_payload(repo=repo, query=query, embedding=embedding_vector)
         supabase.table("repos").upsert(row, on_conflict="url").execute()
+        logger.debug("Upserted repository job_id={} repo_name='{}'", job_id, repo_name)
 
     if len(repos) == 30:
         _mark_job_continue_pagination(supabase=supabase, job_id=job_id, next_page=current_page + 1)
+        logger.info(
+            "Job has next page job_id={} query='{}' next_page={}",
+            job_id,
+            query,
+            current_page + 1,
+        )
     else:
         _mark_job_completed(supabase=supabase, job_id=job_id)
+        logger.info("Completed ingestion job job_id={} query='{}'", job_id, query)
 
     return retry_count
 
@@ -251,6 +268,7 @@ async def run_daemon():
     """Poll ingestion_queue and ingest top GitHub repos into repos with embeddings."""
     supabase = _get_supabase_client()
     max_retries = 3
+    logger.info("GitHub ingestion daemon started max_retries={}", max_retries)
 
     async with httpx.AsyncClient(timeout=45.0) as client:
         while True:
@@ -262,15 +280,21 @@ async def run_daemon():
                     continue
 
                 await _process_job(supabase=supabase, client=client, job=job)
-            except Exception as exc:
-                logger.exception("Failed processing ingestion_queue item")
+            except Exception:
+                job_id = str(job.get("id")) if job else "unknown"
+                query = str(job.get("query")) if job else "unknown"
+                logger.exception("Failed processing ingestion_queue item job_id={} query='{}'", job_id, query)
                 if job and job.get("id") is not None:
                     _mark_job_failed(
                         supabase=supabase,
                         job_id=str(job["id"]),
                         retry_count=int(job.get("retry_count") or 0),
                     )
-                logger.error("Queue item failed with error: %s", exc)
+                    logger.warning(
+                        "Marked ingestion job as failed job_id={} retry_count={}",
+                        str(job["id"]),
+                        int(job.get("retry_count") or 0) + 1,
+                    )
 
             # Respect API rate limits and keep a predictable polling cadence.
             await asyncio.sleep(10)

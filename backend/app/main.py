@@ -1,7 +1,9 @@
 from fastapi import FastAPI
+from fastapi import HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.agent import process_search_query
+from app.logger import logger
 from app.schemas import AgentResponse, SearchRequest
 
 
@@ -19,4 +21,11 @@ app.add_middleware(
 
 @app.post("/api/search", response_model=AgentResponse)
 async def search(request: SearchRequest) -> AgentResponse:
-	return await process_search_query(request)
+	logger.info("Received search request query='{}' has_context={}", request.query, bool(request.context))
+	try:
+		response = await process_search_query(request)
+		logger.info("Search request completed query='{}' status='{}'", request.query, response.status)
+		return response
+	except Exception:
+		logger.exception("Search endpoint failed for query='{}'", request.query)
+		raise HTTPException(status_code=500, detail="Internal server error")

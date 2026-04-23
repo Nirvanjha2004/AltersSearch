@@ -7,6 +7,7 @@ from langchain_core.prompts import PromptTemplate
 from pydantic import BaseModel, Field
 
 from app.database import vector_search
+from app.logger import logger
 from app.schemas import AgentResponse, SearchRequest
 
 
@@ -108,6 +109,7 @@ async def process_search_query(request: SearchRequest) -> AgentResponse:
 			}
 		)
 	except Exception:
+		logger.exception("Query assessment failed for query='{}'", request.query)
 		# Conservative fallback: if model/parsing fails, ask for clarification.
 		return AgentResponse(
 			status="needs_clarification",
@@ -134,6 +136,11 @@ async def process_search_query(request: SearchRequest) -> AgentResponse:
 		query_embedding = await _embed_query_text(search_text)
 		results = vector_search(query_embedding=query_embedding, domain=assessment.domain)
 	except Exception:
+		logger.exception(
+			"Vector search failed for query='{}' domain='{}'",
+			request.query,
+			assessment.domain,
+		)
 		# Keep the API contract stable even if embeddings or DB lookup fails.
 		results = []
 
