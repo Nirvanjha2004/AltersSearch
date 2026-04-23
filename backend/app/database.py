@@ -1,9 +1,16 @@
 import importlib
 import os
 from typing import Any, Optional
-
 from app.schemas import SearchResult
+from dotenv import load_dotenv
+import os
 
+# Ye line .env file se variables read karke os.environ mein daal degi
+load_dotenv() 
+
+# Ab aapka _get_supabase_client() function inhein dhoond payega
+url = os.getenv("SUPABASE_URL")
+key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 
 def _get_supabase_client():
 	"""Build a Supabase client from environment variables."""

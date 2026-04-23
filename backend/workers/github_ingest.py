@@ -1,11 +1,9 @@
 import asyncio
 import importlib
-import os
 import time
 from typing import Any
 from dotenv import load_dotenv
 import os
-import httpx
 
 # Ye line .env file se variables read karke os.environ mein daal degi
 load_dotenv() 
@@ -13,28 +11,13 @@ load_dotenv()
 # Ab aapka _get_supabase_client() function inhein dhoond payega
 url = os.getenv("SUPABASE_URL")
 key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+import httpx
+from supabase import acreate_client
+
+from loguru import logger
 
 
 GITHUB_SEARCH_URL = "https://api.github.com/search/repositories"
-
-
-def _get_supabase_client():
-    supabase_module = importlib.import_module("supabase")
-    create_client = getattr(supabase_module, "create_client")
-
-    supabase_url = os.getenv("SUPABASE_URL")
-    supabase_key = (
-        os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-        or os.getenv("SUPABASE_SERVICE_KEY")
-        or os.getenv("SUPABASE_ANON_KEY")
-    )
-
-    if not supabase_url or not supabase_key:
-        raise ValueError(
-            "SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_SERVICE_KEY, SUPABASE_ANON_KEY) are required."
-        )
-
-    return create_client(supabase_url, supabase_key)
 
 
 def _get_embeddings_model():
@@ -145,8 +128,8 @@ def _build_insert_payload(repo: dict[str, Any], query: str, embedding: list[floa
     }
 
 
-def _claim_next_job(supabase, max_retries: int) -> dict[str, Any] | None:
-    response = (
+async def _claim_next_job(supabase, max_retries: int) -> dict[str, Any] | None:
+    response = await (
         supabase.table("ingestion_queue")
         .select("id,query,status,retry_count,current_page,last_updated")
         .in_("status", ["pending", "failed"])
@@ -165,7 +148,7 @@ def _claim_next_job(supabase, max_retries: int) -> dict[str, Any] | None:
     if job_id is None:
         return None
 
-    supabase.table("ingestion_queue").update(
+    await supabase.table("ingestion_queue").update(
         {
             "status": "processing",
             "last_updated": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
@@ -175,8 +158,8 @@ def _claim_next_job(supabase, max_retries: int) -> dict[str, Any] | None:
     return job
 
 
-def _mark_job_completed(supabase, job_id: str):
-    supabase.table("ingestion_queue").update(
+async def _mark_job_completed(supabase, job_id: str):
+    await supabase.table("ingestion_queue").update(
         {
             "status": "completed",
             "last_updated": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
@@ -184,8 +167,8 @@ def _mark_job_completed(supabase, job_id: str):
     ).eq("id", job_id).execute()
 
 
-def _mark_job_failed(supabase, job_id: str, retry_count: int):
-    supabase.table("ingestion_queue").update(
+async def _mark_job_failed(supabase, job_id: str, retry_count: int):
+    await supabase.table("ingestion_queue").update(
         {
             "status": "failed",
             "retry_count": retry_count + 1,
@@ -194,8 +177,8 @@ def _mark_job_failed(supabase, job_id: str, retry_count: int):
     ).eq("id", job_id).execute()
 
 
-def _mark_job_continue_pagination(supabase, job_id: str, next_page: int):
-    supabase.table("ingestion_queue").update(
+async def _mark_job_continue_pagination(supabase, job_id: str, next_page: int):
+    await supabase.table("ingestion_queue").update(
         {
             "status": "pending",
             "current_page": next_page,
@@ -245,12 +228,13 @@ async def _process_job(supabase, client: httpx.AsyncClient, job: dict[str, Any])
         if not url:
             logger.warning("Skipping repository without URL job_id={} repo_name='{}'", job_id, repo_name)
             continue
+
         row = _build_insert_payload(repo=repo, query=query, embedding=embedding_vector)
-        supabase.table("repos").upsert(row, on_conflict="url").execute()
+        await supabase.table("repos").upsert(row, on_conflict="url").execute()
         logger.debug("Upserted repository job_id={} repo_name='{}'", job_id, repo_name)
 
     if len(repos) == 30:
-        _mark_job_continue_pagination(supabase=supabase, job_id=job_id, next_page=current_page + 1)
+        await _mark_job_continue_pagination(supabase=supabase, job_id=job_id, next_page=current_page + 1)
         logger.info(
             "Job has next page job_id={} query='{}' next_page={}",
             job_id,
@@ -258,7 +242,7 @@ async def _process_job(supabase, client: httpx.AsyncClient, job: dict[str, Any])
             current_page + 1,
         )
     else:
-        _mark_job_completed(supabase=supabase, job_id=job_id)
+        await _mark_job_completed(supabase=supabase, job_id=job_id)
         logger.info("Completed ingestion job job_id={} query='{}'", job_id, query)
 
     return retry_count
@@ -266,7 +250,18 @@ async def _process_job(supabase, client: httpx.AsyncClient, job: dict[str, Any])
 
 async def run_daemon():
     """Poll ingestion_queue and ingest top GitHub repos into repos with embeddings."""
-    supabase = _get_supabase_client()
+    supabase_url = os.getenv("SUPABASE_URL")
+    supabase_key = (
+        os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+        or os.getenv("SUPABASE_SERVICE_KEY")
+        or os.getenv("SUPABASE_ANON_KEY")
+    )
+    if not supabase_url or not supabase_key:
+        raise ValueError(
+            "SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_SERVICE_KEY, SUPABASE_ANON_KEY) are required."
+        )
+
+    supabase = await acreate_client(supabase_url, supabase_key)
     max_retries = 3
     logger.info("GitHub ingestion daemon started max_retries={}", max_retries)
 
@@ -274,7 +269,7 @@ async def run_daemon():
         while True:
             job = None
             try:
-                job = _claim_next_job(supabase=supabase, max_retries=max_retries)
+                job = await _claim_next_job(supabase=supabase, max_retries=max_retries)
                 if job is None:
                     await asyncio.sleep(10)
                     continue
@@ -285,7 +280,7 @@ async def run_daemon():
                 query = str(job.get("query")) if job else "unknown"
                 logger.exception("Failed processing ingestion_queue item job_id={} query='{}'", job_id, query)
                 if job and job.get("id") is not None:
-                    _mark_job_failed(
+                    await _mark_job_failed(
                         supabase=supabase,
                         job_id=str(job["id"]),
                         retry_count=int(job.get("retry_count") or 0),

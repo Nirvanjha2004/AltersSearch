@@ -9,8 +9,14 @@ from pydantic import BaseModel, Field
 from app.database import vector_search
 from app.logger import logger
 from app.schemas import AgentResponse, SearchRequest
+from dotenv import load_dotenv
+import os
 
+# Ye line .env file se variables read karke os.environ mein daal degi
+load_dotenv() 
 
+# Ab aapka _get_supabase_client() function inhein dhoond payega
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 class QueryAssessment(BaseModel):
 	"""Structured output returned by the LLM classifier."""
 
