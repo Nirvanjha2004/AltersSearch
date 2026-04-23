@@ -24,15 +24,31 @@ def _get_supabase_client():
 
 
 def _get_embeddings_model():
-    openai_api_key = os.getenv("OPENAI_API_KEY")
-    if not openai_api_key:
-        raise ValueError("OPENAI_API_KEY is required for OpenAIEmbeddings.")
+    google_api_key = os.getenv("GOOGLE_API_KEY")
+    if not google_api_key:
+        raise ValueError("GOOGLE_API_KEY is required for GoogleGenerativeAIEmbeddings.")
 
-    openai_embeddings_class = getattr(importlib.import_module("langchain_openai"), "OpenAIEmbeddings")
-    return openai_embeddings_class(
-        model=os.getenv("EMBEDDING_MODEL", "text-embedding-3-small"),
-        api_key=openai_api_key,
+    google_embeddings_class = getattr(
+        importlib.import_module("langchain_google_genai"),
+        "GoogleGenerativeAIEmbeddings",
     )
+    return google_embeddings_class(
+        model=os.getenv("EMBEDDING_MODEL", "gemini-embedding-2-preview"),
+        google_api_key=google_api_key,
+        output_dimensionality=int(os.getenv("EMBEDDING_DIMENSION", "1536")),
+    )
+
+
+async def _embed_text(model, text: str) -> list[float]:
+    if hasattr(model, "aembed_query"):
+        vector = await model.aembed_query(text)
+        return list(vector)
+
+    if hasattr(model, "embed_query"):
+        vector = model.embed_query(text)
+        return list(vector)
+
+    raise RuntimeError("No supported embedding method was found on the embeddings model.")
 
 
 async def _fetch_top_repositories(client: httpx.AsyncClient, query: str, limit: int = 50) -> list[dict[str, Any]]:
@@ -114,8 +130,8 @@ async def ingest_github_repos(domain: str, query: str):
         text_for_embedding = description.strip() or (repo.get("full_name") or repo.get("name") or "")
 
         try:
-            embedding_vector = await embeddings_model.aembed_query(text_for_embedding)
-            row = _build_insert_payload(repo=repo, domain=normalized_domain, embedding=list(embedding_vector))
+            embedding_vector = await _embed_text(embeddings_model, text_for_embedding)
+            row = _build_insert_payload(repo=repo, domain=normalized_domain, embedding=embedding_vector)
             supabase.table("repos").upsert(row, on_conflict="url").execute()
             inserted += 1
         except Exception:

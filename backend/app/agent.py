@@ -60,15 +60,19 @@ def _build_llm():
 
 def _build_embeddings_model():
 	"""Build an embeddings model for vector search queries."""
-	openai_api_key = os.getenv("OPENAI_API_KEY")
-	if openai_api_key:
-		openai_embeddings_class = getattr(importlib.import_module("langchain_openai"), "OpenAIEmbeddings")
-		return openai_embeddings_class(
-			model=os.getenv("EMBEDDING_MODEL", "text-embedding-3-small"),
-			api_key=openai_api_key,
+	google_api_key = os.getenv("GOOGLE_API_KEY")
+	if google_api_key:
+		google_embeddings_class = getattr(
+			importlib.import_module("langchain_google_genai"),
+			"GoogleGenerativeAIEmbeddings",
+		)
+		return google_embeddings_class(
+			model=os.getenv("EMBEDDING_MODEL", "gemini-embedding-2-preview"),
+			google_api_key=google_api_key,
+			output_dimensionality=int(os.getenv("EMBEDDING_DIMENSION", "1536")),
 		)
 
-	# Fallback to a local model when OPENAI_API_KEY is not available.
+	# Fallback to a local model when GOOGLE_API_KEY is not available.
 	sentence_transformer_class = getattr(importlib.import_module("sentence_transformers"), "SentenceTransformer")
 	return sentence_transformer_class(os.getenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2"))
 
