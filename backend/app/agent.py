@@ -1,11 +1,10 @@
 import os
 import importlib
 from typing import Literal, Optional
-
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_core.output_parsers import PydanticOutputParser
 from langchain_core.prompts import PromptTemplate
 from pydantic import BaseModel, Field
-from langchain_huggingface import HuggingFaceEmbeddings
 from app.database import vector_search
 from app.logger import logger
 from app.schemas import AgentResponse, SearchRequest
@@ -66,23 +65,14 @@ def _build_llm():
 
 
 def _build_embeddings_model():
-	"""Build an embeddings model for vector search queries."""
-	google_api_key = os.getenv("GOOGLE_API_KEY")
-	if google_api_key:
-		google_embeddings_class = getattr(
-			importlib.import_module("langchain_google_genai"),
-			"GoogleGenerativeAIEmbeddings",
-		)
-		return google_embeddings_class(
-			model=os.getenv("EMBEDDING_MODEL", "gemini-embedding-2-preview"),
-			google_api_key=google_api_key,
-			output_dimensionality=int(os.getenv("EMBEDDING_DIMENSION", "1536")),
-		)
-
-	# Fallback to a local model when GOOGLE_API_KEY is not available.
-	sentence_transformer_class = getattr(importlib.import_module("sentence_transformers"), "SentenceTransformer")
-	return sentence_transformer_class(os.getenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2"))
-
+    """
+    Build an embeddings model for vector search queries.
+    Runs 100% locally using HuggingFace to bypass API limits.
+    """
+    # Uses the environment variable if set, otherwise defaults to the fast local model
+    model_name = os.getenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
+    
+    return HuggingFaceEmbeddings(model_name=model_name)
 
 async def _embed_query_text(text: str) -> list[float]:
 	model = _build_embeddings_model()

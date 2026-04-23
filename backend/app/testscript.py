@@ -1,12 +1,15 @@
 import asyncio
 from dotenv import load_dotenv
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
+# We need to explicitly import the HuggingFace module here!
+from langchain_huggingface import HuggingFaceEmbeddings
 
-# This line is the magic fix: it loads your GOOGLE_API_KEY from the .env file
 load_dotenv()
 
 async def test_dim():
-    model = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-001")
+    # This will download the model the first time it runs (~90MB)
+    model = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+    
+    # We use aembed_query to test the async generation
     vector = await model.aembed_query("Just testing the dimensions")
     print(f"Bhaii, the dimension size is exactly: {len(vector)}")
 
