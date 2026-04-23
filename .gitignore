@@ -1,0 +1,43 @@
+# OS and editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+!.env.*.example
+backend/.env
+frontend/.env.local
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+.python-version
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+env/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+.npm/
+
+# Build and logs
+build/
+dist/
+coverage/
+*.log
+
+# Docker
+*.pid
+*.seed
