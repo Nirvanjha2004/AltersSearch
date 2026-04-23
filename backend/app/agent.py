@@ -1,147 +1,122 @@
+import asyncio
 import os
-import importlib
-from typing import Literal, Optional
+from typing import Any
+
+from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_groq import ChatGroq
 from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_core.output_parsers import PydanticOutputParser
-from langchain_core.prompts import PromptTemplate
 from pydantic import BaseModel, Field
+
 from app.database import vector_search
 from app.logger import logger
-from app.schemas import AgentResponse, SearchRequest
-from dotenv import load_dotenv
-import os
+from app.schemas import SearchRequest
 
-# Ye line .env file se variables read karke os.environ mein daal degi
-load_dotenv() 
 
-# Ab aapka _get_supabase_client() function inhein dhoond payega
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 class QueryAssessment(BaseModel):
-	"""Structured output returned by the LLM classifier."""
-
-	status: Literal["success", "needs_clarification"]
-	domain: Optional[str] = Field(
-		default="all",
-		description="Domain filter if explicitly known (e.g., ai, frontend, backend, devops). Use 'all' if unspecified.",
-	)
-	clarification_question: Optional[str] = Field(
-		default=None,
-		description="Required only when status is 'needs_clarification'.",
-	)
-
-
-_ASSESSMENT_PARSER = PydanticOutputParser(pydantic_object=QueryAssessment)
-
-_ASSESSMENT_PROMPT = PromptTemplate(
-	template=(
-		"You are an expert search query analyst.\n"
-		"Your job: decide if the user query is specific enough to run a code/repository search.\n\n"
-		"Return status='needs_clarification' when the query is highly ambiguous, vague, or missing key constraints\n"
-		"(e.g., 'make it fast', 'improve this', 'fix it'). In that case, ask exactly one short, actionable\n"
-		"clarifying question.\n\n"
-		"Return status='success' when the query is concrete enough to execute directly.\n"
-			"Also extract an optional domain filter ONLY if the user clearly names one (examples: frontend, backend, ai, devops, data, mobile).\n"
-			"If domain is not explicit, use domain='all'.\n"
-		"When status='success', set clarification_question to null.\n\n"
-		"User query: {query}\n"
-		"Optional prior context: {context}\n\n"
-		"{format_instructions}"
-	),
-	input_variables=["query", "context"],
-	partial_variables={
-		"format_instructions": _ASSESSMENT_PARSER.get_format_instructions()
-	},
-)
+    is_clear: bool = Field(description="Whether the user query is clear enough for software engineering search.")
+    clarification_question: str = Field(
+        description="One concise clarification question when query is unclear. Empty string when query is clear."
+    )
+    optimized_query: str = Field(
+        description="A concise, improved software engineering search query preserving user intent."
+    )
 
 
 def _build_llm():
-	"""Create a fast Groq-backed chat model for classification."""
-	chat_groq_class = getattr(importlib.import_module("langchain_groq"), "ChatGroq")
-	return chat_groq_class(
-		model=os.getenv("GROQ_MODEL", "llama-3.1-8b-instant"),
-		api_key=os.getenv("GROQ_API_KEY"),
-		temperature=0,
-	)
+    llm = ChatGroq(
+        model="llama3-8b-8192",
+        api_key=os.getenv("GROQ_API_KEY"),
+        temperature=0,
+    )
+    return llm.with_structured_output(QueryAssessment)
 
 
 def _build_embeddings_model():
-    """
-    Build an embeddings model for vector search queries.
-    Runs 100% locally using HuggingFace to bypass API limits.
-    """
-    # Uses the environment variable if set, otherwise defaults to the fast local model
+    """Build a local HuggingFace embeddings model for vector search."""
     model_name = os.getenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
-    
     return HuggingFaceEmbeddings(model_name=model_name)
 
+
 async def _embed_query_text(text: str) -> list[float]:
-	model = _build_embeddings_model()
+    model = _build_embeddings_model()
 
-	if hasattr(model, "aembed_query"):
-		vector = await model.aembed_query(text)
-		return list(vector)
+    if hasattr(model, "aembed_query"):
+        vector = await model.aembed_query(text)
+        return list(vector)
 
-	if hasattr(model, "embed_query"):
-		vector = model.embed_query(text)
-		return list(vector)
+    if hasattr(model, "embed_query"):
+        vector = model.embed_query(text)
+        return list(vector)
 
-	if hasattr(model, "encode"):
-		vector = model.encode(text)
-		return vector.tolist() if hasattr(vector, "tolist") else list(vector)
+    if hasattr(model, "encode"):
+        vector = model.encode(text)
+        return vector.tolist() if hasattr(vector, "tolist") else list(vector)
 
-	raise RuntimeError("No supported embedding method was found on the embeddings model.")
+    raise RuntimeError("No supported embedding method was found on the embeddings model.")
 
 
-async def process_search_query(request: SearchRequest) -> AgentResponse:
-	"""Analyze the query and return either clarification-needed or vector search results."""
-	llm = _build_llm()
-	chain = _ASSESSMENT_PROMPT | llm | _ASSESSMENT_PARSER
+async def process_search_query(request: SearchRequest) -> dict[str, Any]:
+    logger.info("Starting gatekeeper evaluation query='{}'", request.query)
+    gatekeeper = _build_llm()
 
-	try:
-		assessment = await chain.ainvoke(
-			{
-				"query": request.query,
-				"context": request.context or "None",
-			}
-		)
-	except Exception:
-		logger.exception("Query assessment failed for query='{}'", request.query)
-		# Conservative fallback: if model/parsing fails, ask for clarification.
-		return AgentResponse(
-			status="needs_clarification",
-			clarification_question=(
-				"Could you share the exact goal, target technology, and constraints for your search?"
-			),
-		)
+    messages = [
+        SystemMessage(
+            content=(
+                "You are an expert software engineering search gatekeeper. "
+                "Decide whether the user query is clear enough for repository/code search. "
+                "If unclear, set is_clear=false and ask one concise clarification question. "
+                "If clear, set is_clear=true and provide an optimized_query for semantic search."
+            )
+        ),
+        HumanMessage(content=request.query),
+    ]
 
-	if assessment.status == "needs_clarification":
-		question = assessment.clarification_question or (
-			"Can you clarify your exact goal and what outcome you want from the search?"
-		)
-		return AgentResponse(
-			status="needs_clarification",
-			clarification_question=question,
-		)
+    try:
+        assessment = await gatekeeper.ainvoke(messages)
+        logger.info(
+            "Gatekeeper decision query='{}' is_clear={} optimized_query='{}'",
+            request.query,
+            assessment.is_clear,
+            assessment.optimized_query,
+        )
+    except Exception:
+        logger.exception("Gatekeeper LLM evaluation failed query='{}'", request.query)
+        assessment = QueryAssessment(
+            is_clear=True,
+            clarification_question="",
+            optimized_query=request.query,
+        )
+        logger.warning("Falling back to raw search query='{}'", request.query)
 
-	search_text = request.query
-	if request.context:
-		search_text = f"{request.query}\nAdditional context: {request.context}"
+    if not assessment.is_clear:
+        logger.warning("Query requires clarification query='{}'", request.query)
+        return {
+            "status": "clarification_needed",
+            "message": assessment.clarification_question,
+            "results": [],
+        }
 
-	results = []
-	try:
-		query_embedding = await _embed_query_text(search_text)
-		results = vector_search(query_embedding=query_embedding, domain=assessment.domain)
-	except Exception:
-		logger.exception(
-			"Vector search failed for query='{}' domain='{}'",
-			request.query,
-			assessment.domain,
-		)
-		# Keep the API contract stable even if embeddings or DB lookup fails.
-		results = []
+    optimized_query = assessment.optimized_query.strip() or request.query
+    logger.info("Embedding optimized query='{}'", optimized_query)
 
-	return AgentResponse(
-		status="success",
-		results=results,
-		clarification_question=None,
-	)
+    try:
+        query_embedding = await _embed_query_text(optimized_query)
+        logger.debug("Embedding created for query='{}' dimension={}", optimized_query, len(query_embedding))
+        search_results = await asyncio.to_thread(
+            vector_search,
+            query_embedding=query_embedding,
+        )
+        logger.info("Vector search completed optimized_query='{}' result_count={}", optimized_query, len(search_results))
+    except Exception:
+        logger.exception("Vector search pipeline failed optimized_query='{}'", optimized_query)
+        return {
+            "status": "error",
+            "message": "Database search failed.",
+            "results": [],
+        }
+
+    return {
+        "status": "success",
+        "message": "Results found.",
+        "results": search_results,
+    }

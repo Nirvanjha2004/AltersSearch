@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.agent import process_search_query
 from app.logger import logger
-from app.schemas import AgentResponse, SearchRequest
+from app.schemas import SearchRequest
 
 
 app = FastAPI(title="Open Source Search API")
@@ -19,12 +19,12 @@ app.add_middleware(
 )
 
 
-@app.post("/api/search", response_model=AgentResponse)
-async def search(request: SearchRequest) -> AgentResponse:
+@app.post("/api/search")
+async def search(request: SearchRequest) -> dict:
 	logger.info("Received search request query='{}' has_context={}", request.query, bool(request.context))
 	try:
 		response = await process_search_query(request)
-		logger.info("Search request completed query='{}' status='{}'", request.query, response.status)
+		logger.info("Search request completed query='{}' status='{}'", request.query, response.get("status"))
 		return response
 	except Exception:
 		logger.exception("Search endpoint failed for query='{}'", request.query)
