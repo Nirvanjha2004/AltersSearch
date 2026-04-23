@@ -5,7 +5,7 @@ from typing import Literal, Optional
 from langchain_core.output_parsers import PydanticOutputParser
 from langchain_core.prompts import PromptTemplate
 from pydantic import BaseModel, Field
-
+from langchain_huggingface import HuggingFaceEmbeddings
 from app.database import vector_search
 from app.logger import logger
 from app.schemas import AgentResponse, SearchRequest

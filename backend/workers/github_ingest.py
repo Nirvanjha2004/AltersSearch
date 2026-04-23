@@ -4,13 +4,10 @@ import time
 from typing import Any
 from dotenv import load_dotenv
 import os
-
+# Remove the Google import
+from langchain_huggingface import HuggingFaceEmbeddings
 # Ye line .env file se variables read karke os.environ mein daal degi
 load_dotenv() 
-
-# Ab aapka _get_supabase_client() function inhein dhoond payega
-url = os.getenv("SUPABASE_URL")
-key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 import httpx
 from supabase import acreate_client
 
@@ -21,19 +18,11 @@ GITHUB_SEARCH_URL = "https://api.github.com/search/repositories"
 
 
 def _get_embeddings_model():
-    google_api_key = os.getenv("GOOGLE_API_KEY")
-    if not google_api_key:
-        raise ValueError("GOOGLE_API_KEY is required for Gemini embeddings.")
-
-    google_embeddings_class = getattr(
-        importlib.import_module("langchain_google_genai"),
-        "GoogleGenerativeAIEmbeddings",
-    )
-    return google_embeddings_class(
-        model="models/gemini-embedding-001",
-        google_api_key=google_api_key,
-        output_dimensionality=768,
-    )
+    """
+    Returns a local HuggingFace embedding model (384 dimensions).
+    Runs 100% locally. Zero API keys. Zero rate limits.
+    """
+    return HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
 
 
 def _infer_domain(query: str, repo: dict[str, Any]) -> str:
@@ -253,7 +242,6 @@ async def run_daemon():
     supabase_url = os.getenv("SUPABASE_URL")
     supabase_key = (
         os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-        or os.getenv("SUPABASE_SERVICE_KEY")
         or os.getenv("SUPABASE_ANON_KEY")
     )
     if not supabase_url or not supabase_key:

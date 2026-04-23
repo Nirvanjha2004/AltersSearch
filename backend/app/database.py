@@ -8,10 +8,6 @@ import os
 # Ye line .env file se variables read karke os.environ mein daal degi
 load_dotenv() 
 
-# Ab aapka _get_supabase_client() function inhein dhoond payega
-url = os.getenv("SUPABASE_URL")
-key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-
 def _get_supabase_client():
 	"""Build a Supabase client from environment variables."""
 	supabase_module = importlib.import_module("supabase")
@@ -46,29 +42,33 @@ def _normalize_result_row(row: dict[str, Any], requested_domain: Optional[str]) 
 
 
 def vector_search(query_embedding: list[float], domain: str = None) -> list[SearchResult]:
-	"""Search Supabase pgvector index using an embedding and optional domain metadata filter."""
-	client = _get_supabase_client()
-	rpc_name = os.getenv("SUPABASE_VECTOR_SEARCH_RPC", "match_repositories")
-	match_count = int(os.getenv("VECTOR_MATCH_COUNT", "12"))
+    """Search Supabase pgvector index using an embedding and optional domain metadata filter."""
+    client = _get_supabase_client()
+    
+    # 1. Changed default to match_repos
+    rpc_name = os.getenv("SUPABASE_VECTOR_SEARCH_RPC", "match_repos") 
+    match_count = int(os.getenv("VECTOR_MATCH_COUNT", "12"))
 
-	payload: dict[str, Any] = {
-		"query_embedding": query_embedding,
-		"match_count": match_count,
-	}
+    normalized_domain = (domain or "").strip().lower()
+    
+    # 2. Perfect match for our SQL function arguments
+    payload: dict[str, Any] = {
+        "query_embedding": query_embedding,
+        "match_threshold": 0.1,  # Added the missing threshold argument!
+        "match_count": match_count,
+        "filter_domain": normalized_domain if normalized_domain and normalized_domain != "all" else None
+    }
 
-	normalized_domain = (domain or "").strip().lower()
-	if normalized_domain and normalized_domain != "all":
-		payload["filter"] = {"domain": normalized_domain}
+    # 3. Execute the search
+    response = client.rpc(rpc_name, payload).execute()
+    rows = response.data or []
 
-	response = client.rpc(rpc_name, payload).execute()
-	rows = response.data or []
+    results: list[SearchResult] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        normalized = _normalize_result_row(row, normalized_domain if normalized_domain else None)
+        if normalized is not None:
+            results.append(normalized)
 
-	results: list[SearchResult] = []
-	for row in rows:
-		if not isinstance(row, dict):
-			continue
-		normalized = _normalize_result_row(row, normalized_domain if normalized_domain else None)
-		if normalized is not None:
-			results.append(normalized)
-
-	return results
+    return results
