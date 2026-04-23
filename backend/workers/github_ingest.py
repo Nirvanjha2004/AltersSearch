@@ -1,5 +1,6 @@
 import asyncio
 import importlib
+import logging
 import os
 import time
 from typing import Any
@@ -8,6 +9,9 @@ import httpx
 
 
 GITHUB_SEARCH_URL = "https://api.github.com/search/repositories"
+
+
+logger = logging.getLogger(__name__)
 
 
 def _get_supabase_client():
@@ -81,30 +85,25 @@ def _build_github_headers() -> dict[str, str]:
     return headers
 
 
-async def _fetch_top_repositories(client: httpx.AsyncClient, query: str, limit: int = 50) -> list[dict[str, Any]]:
+async def _fetch_repositories_page(
+    client: httpx.AsyncClient,
+    query: str,
+    page: int,
+    per_page: int = 30,
+) -> list[dict[str, Any]]:
     headers = _build_github_headers()
-
     params = {
         "q": query,
+        "page": page,
+        "per_page": per_page,
         "sort": "stars",
         "order": "desc",
-        "per_page": min(limit, 100),
-        "page": 1,
     }
 
     try:
         response = await client.get(GITHUB_SEARCH_URL, params=params, headers=headers)
     except httpx.HTTPError as exc:
         raise RuntimeError(f"Failed to call GitHub API: {exc}") from exc
-
-    if response.status_code == 403:
-        # Respect GitHub rate-limit reset when available.
-        reset_header = response.headers.get("x-ratelimit-reset")
-        wait_seconds = 15
-        if reset_header and reset_header.isdigit():
-            wait_seconds = max(1, int(reset_header) - int(time.time()) + 1)
-        await asyncio.sleep(wait_seconds)
-        response = await client.get(GITHUB_SEARCH_URL, params=params, headers=headers)
 
     if response.status_code >= 400:
         raise RuntimeError(f"GitHub API returned {response.status_code}: {response.text}")
@@ -114,7 +113,7 @@ async def _fetch_top_repositories(client: httpx.AsyncClient, query: str, limit: 
     if not isinstance(items, list):
         return []
 
-    return items[:limit]
+    return items
 
 
 async def _embed_texts(model, texts: list[str]) -> list[list[float]]:
@@ -129,7 +128,7 @@ async def _embed_texts(model, texts: list[str]) -> list[list[float]]:
         vectors = model.embed_documents(texts)
         return [list(map(float, vector)) for vector in vectors]
 
-    raise RuntimeError("No supported embedding method was found on the Gemini embeddings model.")
+    raise RuntimeError("No supported embedding method found on the Gemini embeddings model.")
 
 
 def _build_insert_payload(repo: dict[str, Any], query: str, embedding: list[float]) -> dict[str, Any]:
@@ -142,50 +141,10 @@ def _build_insert_payload(repo: dict[str, Any], query: str, embedding: list[floa
     }
 
 
-async def _ingest_query(supabase, client: httpx.AsyncClient, query: str) -> dict[str, int]:
-    if not query or not query.strip():
-        raise ValueError("query must be a non-empty string")
-
-    repos = await _fetch_top_repositories(client=client, query=query, limit=30)
-    texts: list[str] = []
-    for repo in repos:
-        description = repo.get("description") or ""
-        fallback = repo.get("full_name") or repo.get("name") or ""
-        texts.append((description.strip() or fallback).strip())
-
-    embeddings_model = _get_embeddings_model()
-    vectors = await _embed_texts(model=embeddings_model, texts=texts)
-
-    inserted = 0
-    failed = 0
-
-    for repo, embedding_vector in zip(repos, vectors):
-        url = repo.get("html_url") or ""
-        if not url:
-            failed += 1
-            continue
-
-        try:
-            row = _build_insert_payload(repo=repo, query=query, embedding=embedding_vector)
-            supabase.table("repos").upsert(row, on_conflict="url").execute()
-            inserted += 1
-        except Exception:
-            failed += 1
-
-        # Small pause between writes to reduce API pressure and smooth throughput.
-        await asyncio.sleep(0.25)
-
-    return {
-        "fetched": len(repos),
-        "inserted": inserted,
-        "failed": failed,
-    }
-
-
 def _claim_next_job(supabase, max_retries: int) -> dict[str, Any] | None:
     response = (
         supabase.table("ingestion_queue")
-        .select("id,query,status,retry_count,last_updated")
+        .select("id,query,status,retry_count,current_page,last_updated")
         .in_("status", ["pending", "failed"])
         .lt("retry_count", max_retries)
         .order("last_updated", desc=False)
@@ -230,12 +189,60 @@ def _mark_job_failed(supabase, job_id: int, retry_count: int):
     ).eq("id", job_id).execute()
 
 
+def _mark_job_continue_pagination(supabase, job_id: int, next_page: int):
+    supabase.table("ingestion_queue").update(
+        {
+            "status": "pending",
+            "current_page": next_page,
+            "retry_count": 0,
+            "last_updated": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        }
+    ).eq("id", job_id).execute()
+
+
+def _build_embedding_text(repo: dict[str, Any]) -> str:
+    description = str(repo.get("description") or "").strip()
+    repo_name = str(repo.get("full_name") or repo.get("name") or "").strip()
+    if description:
+        return description
+    if repo_name:
+        return repo_name
+    return "repository"
+
+
+async def _process_job(supabase, client: httpx.AsyncClient, job: dict[str, Any]):
+    job_id = int(job["id"])
+    query = str(job.get("query") or "").strip()
+    retry_count = int(job.get("retry_count") or 0)
+    current_page = int(job.get("current_page") or 1)
+
+    if not query:
+        raise ValueError("query must be a non-empty string")
+
+    repos = await _fetch_repositories_page(client=client, query=query, page=current_page, per_page=30)
+    texts = [_build_embedding_text(repo) for repo in repos]
+    embeddings_model = _get_embeddings_model()
+    vectors = await _embed_texts(model=embeddings_model, texts=texts)
+
+    for repo, embedding_vector in zip(repos, vectors):
+        url = repo.get("html_url") or ""
+        if not url:
+            continue
+        row = _build_insert_payload(repo=repo, query=query, embedding=embedding_vector)
+        supabase.table("repos").upsert(row, on_conflict="url").execute()
+
+    if len(repos) == 30:
+        _mark_job_continue_pagination(supabase=supabase, job_id=job_id, next_page=current_page + 1)
+    else:
+        _mark_job_completed(supabase=supabase, job_id=job_id)
+
+    return retry_count
+
+
 async def run_daemon():
     """Poll ingestion_queue and ingest top GitHub repos into repos with embeddings."""
     supabase = _get_supabase_client()
-    poll_interval_seconds = float(os.getenv("INGEST_POLL_INTERVAL_SECONDS", "10"))
-    loop_sleep_seconds = float(os.getenv("INGEST_LOOP_SLEEP_SECONDS", "1.5"))
-    max_retries = int(os.getenv("INGEST_MAX_RETRIES", "5"))
+    max_retries = 3
 
     async with httpx.AsyncClient(timeout=45.0) as client:
         while True:
@@ -243,30 +250,22 @@ async def run_daemon():
             try:
                 job = _claim_next_job(supabase=supabase, max_retries=max_retries)
                 if job is None:
-                    await asyncio.sleep(poll_interval_seconds)
+                    await asyncio.sleep(10)
                     continue
 
-                job_id = int(job["id"])
-                query = str(job.get("query") or "").strip()
-                retry_count = int(job.get("retry_count") or 0)
-
-                if not query:
-                    _mark_job_failed(supabase=supabase, job_id=job_id, retry_count=retry_count)
-                    await asyncio.sleep(loop_sleep_seconds)
-                    continue
-
-                await _ingest_query(supabase=supabase, client=client, query=query)
-                _mark_job_completed(supabase=supabase, job_id=job_id)
-            except Exception:
+                await _process_job(supabase=supabase, client=client, job=job)
+            except Exception as exc:
+                logger.exception("Failed processing ingestion_queue item")
                 if job and job.get("id") is not None:
                     _mark_job_failed(
                         supabase=supabase,
                         job_id=int(job["id"]),
                         retry_count=int(job.get("retry_count") or 0),
                     )
+                logger.error("Queue item failed with error: %s", exc)
 
-            # Global throttle for queue polling/processing loops.
-            await asyncio.sleep(loop_sleep_seconds)
+            # Respect API rate limits and keep a predictable polling cadence.
+            await asyncio.sleep(10)
 
 
 if __name__ == "__main__":
