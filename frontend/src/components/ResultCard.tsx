@@ -1,6 +1,8 @@
 import type { SearchResult } from "../types";
 import { motion } from "framer-motion";
 import { AlertCircle, Archive, Eye, GitFork, Lock, Star } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 type ResultCardProps = {
 	result: SearchResult;
@@ -8,6 +10,7 @@ type ResultCardProps = {
 };
 
 export default function ResultCard({ result, index }: ResultCardProps) {
+	const router = useRouter();
 	const languageColors: Record<string, string> = {
 		TypeScript: "#3178c6",
 		JavaScript: "#f1e05a",
@@ -23,6 +26,8 @@ export default function ResultCard({ result, index }: ResultCardProps) {
 	};
 
 	const fullName = result.full_name || result.repo_name;
+	const [owner = "", repo = ""] = fullName.split("/");
+	const detailsHref = owner && repo ? `/repo/${owner}/${repo}` : result.url;
 	const ownerLogin = result.owner_login || fullName.split("/")[0] || "unknown";
 	const visibility = result.visibility || "public";
 	const topics = Array.isArray(result.topics) ? result.topics : [];
@@ -54,6 +59,15 @@ export default function ResultCard({ result, index }: ResultCardProps) {
 			animate={{ opacity: 1, y: 0 }}
 			transition={{ delay: index * 0.06, duration: 0.24, ease: "easeOut" }}
 			whileHover={{ scale: 1.02, y: -2, boxShadow: "0 14px 34px rgba(15, 23, 42, 0.36)" }}
+			onClick={() => router.push(detailsHref)}
+			onKeyDown={(event) => {
+				if (event.key === "Enter" || event.key === " ") {
+					event.preventDefault();
+					router.push(detailsHref);
+				}
+			}}
+			role="button"
+			tabIndex={0}
 		>
 			<div className="pointer-events-none absolute inset-0 rounded-2xl p-[1px] opacity-0 transition duration-200 group-hover:opacity-100">
 				<div className="h-full w-full rounded-2xl bg-[linear-gradient(145deg,color-mix(in_srgb,var(--accent)_62%,transparent),transparent_35%,transparent)]" />
@@ -82,14 +96,13 @@ export default function ResultCard({ result, index }: ResultCardProps) {
 				</span>
 			</div>
 
-			<a
-				href={result.url}
-				target="_blank"
-				rel="noreferrer"
+			<Link
+				href={owner && repo ? `/repo/${owner}/${repo}` : result.url}
+				onClick={(event) => event.stopPropagation()}
 				className="relative z-10 mb-2 block text-[16px] font-semibold tracking-tight text-[var(--text-primary)] no-underline transition hover:text-[var(--accent)] hover:underline"
 			>
 				{fullName}
-			</a>
+			</Link>
 
 			<p className="relative z-10 mb-4 line-clamp-2 min-h-[44px] text-[13px] leading-6 text-[var(--text-secondary)]">{result.description || "No description provided."}</p>
 
