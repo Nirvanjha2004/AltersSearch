@@ -5,9 +5,23 @@ export interface SearchRequest {
 
 export interface SearchResult {
   repo_name: string;
+  full_name?: string;
   description: string;
   url: string;
   domain: string;
+  owner_avatar_url?: string;
+  owner_login?: string;
+  visibility?: string;
+  topics?: string[];
+  language?: string;
+  stargazers_count?: number;
+  forks_count?: number;
+  open_issues_count?: number;
+  license_name?: string;
+  github_pushed_at?: string;
+  github_created_at?: string;
+  is_archived?: boolean;
+  is_fork?: boolean;
 }
 
 export interface AgentResponse {
