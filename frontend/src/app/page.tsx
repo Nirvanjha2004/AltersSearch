@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import AnswerCard from "../components/AnswerCard";
 import ClarificationCard from "../components/ClarificationCard";
 import EmptyState from "../components/EmptyState";
@@ -128,7 +129,7 @@ export default function HomePage() {
   const sourceForAnswer = results.find((item) => item.url)?.url;
 
   return (
-    <div className="app-shell">
+    <div className="app-shell bg-[radial-gradient(1200px_700px_at_70%_-20%,rgba(124,58,237,0.18),transparent_55%),radial-gradient(900px_500px_at_0%_20%,rgba(59,130,246,0.14),transparent_45%),#0a0a0a]">
       <Topbar onToggleMobileNav={() => setMobileNavOpen((value) => !value)} />
       <div className="content-shell">
         <Sidebar
@@ -137,82 +138,88 @@ export default function HomePage() {
           onNewSearch={resetSearch}
           isMobileOpen={mobileNavOpen}
           onCloseMobile={() => setMobileNavOpen(false)}
+          activeQuery={originalQuery}
         />
 
         <main className="main-area">
-          <div className="main-inner">
-            {errorMessage ? <div className="error-banner">{errorMessage}</div> : null}
-
-            {viewState === "search" ? (
-              <div className="landing-wrap">
-                <EmptyState onSuggestionClick={handleSuggestion} />
-                <SearchBar onSubmit={handleInitialSearch} isLoading={isLoading} routeMode={routeMode} autoFocus />
-                {isLoading ? (
-                  <div className="skeleton-stack">
-                    {[0, 1, 2].map((index) => (
-                      <SkeletonCard key={index} index={index} />
-                    ))}
-                  </div>
-                ) : null}
-              </div>
+          <div className="main-inner max-w-[760px] px-6 py-10 md:px-8">
+            {errorMessage ? (
+              <motion.div className="error-banner" initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}>
+                {errorMessage}
+              </motion.div>
             ) : null}
 
-            {viewState === "clarification" ? (
-              <section className="result-area">
-                <ClarificationCard question={clarificationQuestion} />
-                <SearchBar
-                  onSubmit={handleClarificationSearch}
-                  isLoading={isLoading}
-                  routeMode="clarify"
-                  initialValue={clarificationPrefill}
-                  autoFocus
-                />
-                {isLoading ? (
-                  <div className="skeleton-stack">
-                    {[0, 1, 2].map((index) => (
-                      <SkeletonCard key={index} index={index} />
-                    ))}
-                  </div>
-                ) : null}
-              </section>
-            ) : null}
+            <AnimatePresence mode="wait">
+              {viewState === "search" ? (
+                <motion.div key="search" className="landing-wrap gap-8" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                  <EmptyState onSuggestionClick={handleSuggestion} />
+                  <SearchBar onSubmit={handleInitialSearch} isLoading={isLoading} routeMode={routeMode} autoFocus />
+                  {isLoading ? (
+                    <div className="skeleton-stack">
+                      {[0, 1, 2].map((index) => (
+                        <SkeletonCard key={index} index={index} />
+                      ))}
+                    </div>
+                  ) : null}
+                </motion.div>
+              ) : null}
 
-            {viewState === "results" ? (
-              <section className="result-area">
-                <h1 className="empty-tagline" style={{ margin: 0 }}>{title}</h1>
-                <SearchBar onSubmit={handleInitialSearch} isLoading={isLoading} routeMode={routeMode} />
+              {viewState === "clarification" ? (
+                <motion.section key="clarification" className="result-area" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
+                  <ClarificationCard question={clarificationQuestion} />
+                  <SearchBar
+                    onSubmit={handleClarificationSearch}
+                    isLoading={isLoading}
+                    routeMode="clarify"
+                    initialValue={clarificationPrefill}
+                    autoFocus
+                  />
+                  {isLoading ? (
+                    <div className="skeleton-stack">
+                      {[0, 1, 2].map((index) => (
+                        <SkeletonCard key={index} index={index} />
+                      ))}
+                    </div>
+                  ) : null}
+                </motion.section>
+              ) : null}
 
-                {isLoading ? (
-                  <div className="skeleton-stack">
-                    {[0, 1, 2].map((index) => (
-                      <SkeletonCard key={index} index={index} />
-                    ))}
-                  </div>
-                ) : (
-                  <>
-                    {enrichedQuery ? <EnrichmentPill query={enrichedQuery} /> : null}
+              {viewState === "results" ? (
+                <motion.section key="results" className="result-area" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
+                  <h1 className="m-0 text-[24px] font-semibold tracking-tight text-zinc-100">{title}</h1>
+                  <SearchBar onSubmit={handleInitialSearch} isLoading={isLoading} routeMode={routeMode} />
 
-                    {answer ? <AnswerCard answer={answer} source={sourceForAnswer} /> : null}
+                  {isLoading ? (
+                    <div className="skeleton-stack">
+                      {[0, 1, 2].map((index) => (
+                        <SkeletonCard key={index} index={index} />
+                      ))}
+                    </div>
+                  ) : (
+                    <>
+                      {enrichedQuery ? <EnrichmentPill query={enrichedQuery} /> : null}
+                      {answer ? <AnswerCard answer={answer} source={sourceForAnswer} /> : null}
 
-                    {results.length === 0 ? (
-                      <div className="empty-results">
-                        <svg viewBox="0 0 24 24" width="40" height="40" aria-hidden="true" style={{ color: "var(--text-muted)" }}>
-                          <path d="m15.5 15.5 4 4M10 18a8 8 0 1 1 5.3-14l-2.5 2.6M9 9h6m-6 4h4" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                        <h3>No results found</h3>
-                        <p>Try a different query or search the web</p>
-                      </div>
-                    ) : (
-                      <div className="results-grid">
-                        {results.map((result, index) => (
-                          <ResultCard key={`${result.url}-${index}`} result={result} index={index} />
-                        ))}
-                      </div>
-                    )}
-                  </>
-                )}
-              </section>
-            ) : null}
+                      {results.length === 0 ? (
+                        <div className="empty-results">
+                          <svg viewBox="0 0 24 24" width="40" height="40" aria-hidden="true" style={{ color: "var(--text-muted)" }}>
+                            <path d="m15.5 15.5 4 4M10 18a8 8 0 1 1 5.3-14l-2.5 2.6M9 9h6m-6 4h4" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                          <h3>No results found</h3>
+                          <p>Try a different query or search the web</p>
+                        </div>
+                      ) : (
+                        <div className="results-grid">
+                          {results.map((result, index) => (
+                            <ResultCard key={`${result.url}-${index}`} result={result} index={index} />
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </motion.section>
+              ) : null}
+            </AnimatePresence>
           </div>
         </main>
       </div>
