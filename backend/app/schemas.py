@@ -10,8 +10,22 @@ class SearchResult(BaseModel):
     description: str
     url: str
     domain: str
+    full_name: Optional[str] = None
+    owner_avatar_url: Optional[str] = None
+    owner_login: Optional[str] = None
+    visibility: Optional[str] = None
+    topics: Optional[List[str]] = None
+    language: Optional[str] = None
+    stargazers_count: Optional[int] = None
+    forks_count: Optional[int] = None
+    open_issues_count: Optional[int] = None
+    license_name: Optional[str] = None
+    github_pushed_at: Optional[str] = None
+    github_created_at: Optional[str] = None
+    is_archived: Optional[bool] = None
+    is_fork: Optional[bool] = None
 
 class AgentResponse(BaseModel):
-    status: Literal["success", "needs_clarification"]
+    status: Literal["success", "clarification_needed", "error"]
     results: Optional[List[SearchResult]] = None
     clarification_question: Optional[str] = None
