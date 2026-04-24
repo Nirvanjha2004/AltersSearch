@@ -54,7 +54,16 @@ body {
   color: var(--text-primary);
   font-family: var(--font-primary), Inter, sans-serif;
   transition: background-color 0.25s ease, color 0.25s ease;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 button,
