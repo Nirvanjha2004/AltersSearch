@@ -1,16 +1,14 @@
 import asyncio
-import importlib
 import time
 from typing import Any
 from dotenv import load_dotenv
 import os
-# Remove the Google import
 from langchain_huggingface import HuggingFaceEmbeddings
-# Ye line .env file se variables read karke os.environ mein daal degi
-load_dotenv() 
+
+load_dotenv()
+
 import httpx
 from supabase import acreate_client
-
 from loguru import logger
 
 
@@ -53,11 +51,9 @@ def _build_github_headers() -> dict[str, str]:
         "X-GitHub-Api-Version": "2022-11-28",
         "User-Agent": "AltersSearch-Ingest-Worker",
     }
-
     github_token = os.getenv("GITHUB_TOKEN")
     if github_token:
         headers["Authorization"] = f"Bearer {github_token}"
-
     return headers
 
 
@@ -104,17 +100,121 @@ async def _embed_texts(model, texts: list[str]) -> list[list[float]]:
         vectors = model.embed_documents(texts)
         return [list(map(float, vector)) for vector in vectors]
 
-    raise RuntimeError("No supported embedding method found on the Gemini embeddings model.")
+    raise RuntimeError("No supported embedding method found on the embeddings model.")
+
+
+def _safe_str(value: Any) -> str | None:
+    """Return stripped string or None."""
+    if value is None:
+        return None
+    s = str(value).strip()
+    return s if s else None
+
+
+def _safe_int(value: Any) -> int | None:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _safe_bool(value: Any) -> bool | None:
+    if value is None:
+        return None
+    return bool(value)
 
 
 def _build_insert_payload(repo: dict[str, Any], query: str, embedding: list[float]) -> dict[str, Any]:
+    """
+    Maps all meaningful GitHub API repo fields to DB columns.
+
+    GitHub Search API returns these fields per repo:
+    https://docs.github.com/en/rest/search/search#search-repositories
+    """
+    owner: dict[str, Any] = repo.get("owner") or {}
+    license_info: dict[str, Any] = repo.get("license") or {}
+
     return {
-        "repo_name": repo.get("full_name") or repo.get("name") or "unknown",
-        "description": repo.get("description") or "",
-        "url": repo.get("html_url") or "",
-        "domain": _infer_domain(query=query, repo=repo),
-        "embedding": embedding,
+        # ── Identity ────────────────────────────────────────────────────────────
+        "github_id":            _safe_int(repo.get("id")),
+        "repo_name":            _safe_str(repo.get("full_name") or repo.get("name")) or "unknown",
+        "name":                 _safe_str(repo.get("name")),
+        "full_name":            _safe_str(repo.get("full_name")),
+        "url":                  _safe_str(repo.get("html_url")) or "",
+        "git_url":              _safe_str(repo.get("git_url")),
+        "ssh_url":              _safe_str(repo.get("ssh_url")),
+        "clone_url":            _safe_str(repo.get("clone_url")),
+        "api_url":              _safe_str(repo.get("url")),          # GitHub REST API URL
+        "homepage":             _safe_str(repo.get("homepage")),
+
+        # ── Description / content ───────────────────────────────────────────────
+        "description":          _safe_str(repo.get("description")),
+        "topics":               repo.get("topics") or [],            # text[]
+
+        # ── Owner ───────────────────────────────────────────────────────────────
+        "owner_login":          _safe_str(owner.get("login")),
+        "owner_id":             _safe_int(owner.get("id")),
+        "owner_type":           _safe_str(owner.get("type")),        # "User" | "Organization"
+        "owner_avatar_url":     _safe_str(owner.get("avatar_url")),
+
+        # ── Stats ────────────────────────────────────────────────────────────────
+        "stargazers_count":     _safe_int(repo.get("stargazers_count")),
+        "watchers_count":       _safe_int(repo.get("watchers_count")),
+        "forks_count":          _safe_int(repo.get("forks_count")),
+        "open_issues_count":    _safe_int(repo.get("open_issues_count")),
+        "size":                 _safe_int(repo.get("size")),         # kilobytes
+
+        # ── Language / tech ─────────────────────────────────────────────────────
+        "language":             _safe_str(repo.get("language")),
+        "domain":               _infer_domain(query=query, repo=repo),
+
+        # ── Flags ────────────────────────────────────────────────────────────────
+        "is_fork":              _safe_bool(repo.get("fork")),
+        "is_private":           _safe_bool(repo.get("private")),
+        "is_archived":          _safe_bool(repo.get("archived")),
+        "is_disabled":          _safe_bool(repo.get("disabled")),
+        "is_template":          _safe_bool(repo.get("is_template")),
+        "has_issues":           _safe_bool(repo.get("has_issues")),
+        "has_projects":         _safe_bool(repo.get("has_projects")),
+        "has_wiki":             _safe_bool(repo.get("has_wiki")),
+        "has_pages":            _safe_bool(repo.get("has_pages")),
+        "has_downloads":        _safe_bool(repo.get("has_downloads")),
+        "has_discussions":      _safe_bool(repo.get("has_discussions")),
+        "allow_forking":        _safe_bool(repo.get("allow_forking")),
+
+        # ── Licence ─────────────────────────────────────────────────────────────
+        "license_key":          _safe_str(license_info.get("key")),
+        "license_name":         _safe_str(license_info.get("name")),
+        "license_spdx_id":      _safe_str(license_info.get("spdx_id")),
+
+        # ── Default branch / visibility ─────────────────────────────────────────
+        "default_branch":       _safe_str(repo.get("default_branch")),
+        "visibility":           _safe_str(repo.get("visibility")),   # "public" | "private"
+
+        # ── Timestamps ─────────────────────────────────────────────────────────
+        "github_created_at":    _safe_str(repo.get("created_at")),
+        "github_updated_at":    _safe_str(repo.get("updated_at")),
+        "github_pushed_at":     _safe_str(repo.get("pushed_at")),
+
+        # ── Embedding ───────────────────────────────────────────────────────────
+        "embedding":            embedding,
     }
+
+
+def _build_embedding_text(repo: dict[str, Any]) -> str:
+    parts = []
+    description = str(repo.get("description") or "").strip()
+    repo_name = str(repo.get("full_name") or repo.get("name") or "").strip()
+    topics = repo.get("topics") or []
+
+    if description:
+        parts.append(description)
+    if repo_name:
+        parts.append(repo_name)
+    if topics:
+        parts.append(" ".join(topics))
+
+    return " ".join(parts) if parts else "repository"
 
 
 async def _claim_next_job(supabase, max_retries: int) -> dict[str, Any] | None:
@@ -177,16 +277,6 @@ async def _mark_job_continue_pagination(supabase, job_id: str, next_page: int):
     ).eq("id", job_id).execute()
 
 
-def _build_embedding_text(repo: dict[str, Any]) -> str:
-    description = str(repo.get("description") or "").strip()
-    repo_name = str(repo.get("full_name") or repo.get("name") or "").strip()
-    if description:
-        return description
-    if repo_name:
-        return repo_name
-    return "repository"
-
-
 async def _process_job(supabase, client: httpx.AsyncClient, job: dict[str, Any]):
     job_id = str(job["id"])
     query = str(job.get("query") or "").strip()
@@ -201,10 +291,7 @@ async def _process_job(supabase, client: httpx.AsyncClient, job: dict[str, Any])
     repos = await _fetch_repositories_page(client=client, query=query, page=current_page, per_page=30)
     logger.info(
         "Fetched repositories job_id={} query='{}' page={} count={}",
-        job_id,
-        query,
-        current_page,
-        len(repos),
+        job_id, query, current_page, len(repos),
     )
 
     texts = [_build_embedding_text(repo) for repo in repos]
@@ -226,9 +313,7 @@ async def _process_job(supabase, client: httpx.AsyncClient, job: dict[str, Any])
         await _mark_job_continue_pagination(supabase=supabase, job_id=job_id, next_page=current_page + 1)
         logger.info(
             "Job has next page job_id={} query='{}' next_page={}",
-            job_id,
-            query,
-            current_page + 1,
+            job_id, query, current_page + 1,
         )
     else:
         await _mark_job_completed(supabase=supabase, job_id=job_id)
@@ -246,7 +331,7 @@ async def run_daemon():
     )
     if not supabase_url or not supabase_key:
         raise ValueError(
-            "SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_SERVICE_KEY, SUPABASE_ANON_KEY) are required."
+            "SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_ANON_KEY) are required."
         )
 
     supabase = await acreate_client(supabase_url, supabase_key)
@@ -279,7 +364,6 @@ async def run_daemon():
                         int(job.get("retry_count") or 0) + 1,
                     )
 
-            # Respect API rate limits and keep a predictable polling cadence.
             await asyncio.sleep(10)
 
 
