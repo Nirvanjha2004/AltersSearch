@@ -1,5 +1,6 @@
 import type { SearchResult } from "../types";
 import { motion } from "framer-motion";
+import { AlertCircle, Archive, Eye, GitFork, Lock, Star } from "lucide-react";
 
 type ResultCardProps = {
 	result: SearchResult;
@@ -7,16 +8,6 @@ type ResultCardProps = {
 };
 
 export default function ResultCard({ result, index }: ResultCardProps) {
-	const domainColorMap: Record<string, string> = {
-		ai: "#7c3aed",
-		frontend: "#3b82f6",
-		backend: "#22c55e",
-		devops: "#f59e0b",
-		data: "#14b8a6",
-		mobile: "#ec4899",
-		all: "#6b7280",
-	};
-
 	const languageColors: Record<string, string> = {
 		TypeScript: "#3178c6",
 		JavaScript: "#f1e05a",
@@ -31,8 +22,6 @@ export default function ResultCard({ result, index }: ResultCardProps) {
 		CSS: "#563d7c",
 	};
 
-	const normalizedDomain = (result.domain || "all").toLowerCase();
-	const domainColor = domainColorMap[normalizedDomain] || domainColorMap.all;
 	const fullName = result.full_name || result.repo_name;
 	const ownerLogin = result.owner_login || fullName.split("/")[0] || "unknown";
 	const visibility = result.visibility || "public";
@@ -60,30 +49,35 @@ export default function ResultCard({ result, index }: ResultCardProps) {
 
 	return (
 		<motion.article
-			className="relative overflow-hidden rounded-2xl border border-white/10 bg-zinc-900/65 p-5 shadow-[0_4px_20px_rgba(0,0,0,0.35)] backdrop-blur transition"
-			style={{ borderLeft: `3px solid ${domainColor}` }}
+			className="group relative overflow-hidden rounded-2xl border border-[var(--bg-border)] bg-[var(--bg-surface)] p-6 shadow-[var(--shadow-subtle)] backdrop-blur transition duration-200 ease-out"
 			initial={{ opacity: 0, y: 8 }}
 			animate={{ opacity: 1, y: 0 }}
 			transition={{ delay: index * 0.06, duration: 0.24, ease: "easeOut" }}
-			whileHover={{ scale: 1.02, y: -2, boxShadow: "0 10px 26px rgba(76,29,149,0.22)" }}
+			whileHover={{ scale: 1.02, y: -2, boxShadow: "0 14px 34px rgba(15, 23, 42, 0.36)" }}
 		>
+			<div className="pointer-events-none absolute inset-0 rounded-2xl p-[1px] opacity-0 transition duration-200 group-hover:opacity-100">
+				<div className="h-full w-full rounded-2xl bg-[linear-gradient(145deg,color-mix(in_srgb,var(--accent)_62%,transparent),transparent_35%,transparent)]" />
+			</div>
+			<div className="pointer-events-none absolute inset-[1px] rounded-2xl bg-[color:color-mix(in_srgb,var(--bg-surface)_90%,transparent)]" />
+
 			{result.is_archived ? (
-				<div className="absolute left-0 top-0 w-full bg-zinc-700/80 py-1 text-center text-[11px] uppercase tracking-[0.08em] text-zinc-200">
+				<div className="absolute left-0 top-0 z-10 w-full bg-amber-500/18 py-1 text-center text-[11px] uppercase tracking-[0.08em] text-amber-200">
 					Archived
 				</div>
 			) : null}
 
-			<div className={`mb-3 flex items-start justify-between gap-3 ${result.is_archived ? "mt-5" : ""}`}>
+			<div className={`relative z-10 mb-3 flex items-start justify-between gap-3 ${result.is_archived ? "mt-5" : ""}`}>
 				<div className="flex items-center gap-2">
 					<img
 						src={result.owner_avatar_url || "https://github.githubassets.com/favicons/favicon-dark.svg"}
 						alt={ownerLogin}
-						className="h-6 w-6 rounded-full border border-white/10"
+						className="h-6 w-6 rounded-full border border-[var(--bg-border)]"
 					/>
-					<span className="text-[13px] font-medium text-zinc-300">{ownerLogin}</span>
-					{result.is_fork ? <span className="text-[11px] text-zinc-500">⑂ fork</span> : null}
+					<span className="text-[13px] font-medium text-[var(--text-secondary)]">{ownerLogin}</span>
+					{result.is_fork ? <span className="text-[11px] text-[var(--text-muted)]">⑂ fork</span> : null}
 				</div>
-				<span className="shrink-0 rounded-full border border-white/10 bg-zinc-800 px-2.5 py-1 text-[11px] uppercase tracking-[0.06em] text-zinc-400">
+				<span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-[var(--bg-border)] bg-[var(--bg-elevated)] px-2.5 py-1 text-[11px] uppercase tracking-[0.06em] text-[var(--text-secondary)]">
+					{visibility === "private" ? <Lock size={11} /> : <Eye size={11} />}
 					{visibility}
 				</span>
 			</div>
@@ -92,40 +86,52 @@ export default function ResultCard({ result, index }: ResultCardProps) {
 				href={result.url}
 				target="_blank"
 				rel="noreferrer"
-				className="mb-2 block text-[16px] font-semibold tracking-tight text-zinc-100 no-underline transition hover:text-violet-300 hover:underline"
+				className="relative z-10 mb-2 block text-[16px] font-semibold tracking-tight text-[var(--text-primary)] no-underline transition hover:text-[var(--accent)] hover:underline"
 			>
 				{fullName}
 			</a>
 
-			<p className="mb-3 line-clamp-2 min-h-[38px] text-[13px] leading-5 text-zinc-400">{result.description || "No description provided."}</p>
+			<p className="relative z-10 mb-4 line-clamp-2 min-h-[44px] text-[13px] leading-6 text-[var(--text-secondary)]">{result.description || "No description provided."}</p>
 
 			{visibleTopics.length > 0 ? (
-				<div className="mb-3 flex flex-wrap gap-2">
+				<div className="relative z-10 mb-3 flex flex-wrap gap-2">
 					{visibleTopics.map((topic) => (
-						<span key={topic} className="rounded-full border border-white/10 bg-zinc-800/80 px-2 py-1 text-[11px] text-zinc-300">
+						<span key={topic} className="rounded-full border border-[var(--bg-border)] bg-[var(--bg-elevated)] px-2.5 py-1 text-[11px] text-[var(--text-secondary)]">
 							{topic}
 						</span>
 					))}
 					{extraTopics > 0 ? (
-						<span className="rounded-full border border-white/10 bg-zinc-800/80 px-2 py-1 text-[11px] text-zinc-400">+{extraTopics} more</span>
+						<span className="rounded-full border border-[var(--bg-border)] bg-[var(--bg-elevated)] px-2.5 py-1 text-[11px] text-[var(--text-muted)]">+{extraTopics} more</span>
 					) : null}
 				</div>
 			) : null}
 
-			<div className="mb-3 flex items-center gap-2 text-[12px] text-zinc-300">
+			<div className="relative z-10 mb-4 flex items-center gap-2 text-[12px] text-[var(--text-secondary)]">
 				<span className="h-2.5 w-2.5 rounded-full" style={{ background: languageColor }} />
 				<span>{language}</span>
 			</div>
 
-			<div className="mb-3 flex flex-wrap items-center gap-3 text-[12px] text-zinc-400">
-				<span>⭐ {result.stargazers_count ?? 0}</span>
-				<span>🍴 {result.forks_count ?? 0}</span>
-				<span>⚠️ {result.open_issues_count ?? 0}</span>
+			<div className="relative z-10 mb-4 flex flex-wrap items-center gap-2 text-[12px] text-[var(--text-secondary)]">
+				<span className="inline-flex items-center gap-1 rounded-full border border-[var(--bg-border)] bg-[var(--bg-elevated)] px-2.5 py-1 text-[var(--text-secondary)]">
+					<Star size={12} />
+					{result.stargazers_count ?? 0}
+				</span>
+				<span className="inline-flex items-center gap-1 rounded-full border border-[var(--bg-border)] bg-[var(--bg-elevated)] px-2.5 py-1 text-[var(--text-secondary)]">
+					<GitFork size={12} />
+					{result.forks_count ?? 0}
+				</span>
+				<span className="inline-flex items-center gap-1 rounded-full border border-[var(--bg-border)] bg-[var(--bg-elevated)] px-2.5 py-1 text-[var(--text-secondary)]">
+					<AlertCircle size={12} />
+					{result.open_issues_count ?? 0}
+				</span>
 			</div>
 
-			<div className="flex items-center justify-between border-t border-white/10 pt-3 text-[12px] text-zinc-500">
+			<div className="relative z-10 flex items-center justify-between border-t border-[var(--bg-border)] pt-3 text-[12px] text-[var(--text-muted)]">
 				<span>{result.license_name || "No license"}</span>
-				<span>{formatRelativeTime(result.github_pushed_at)}</span>
+				<span className="inline-flex items-center gap-1">
+					{result.is_archived ? <Archive size={12} className="text-amber-300" /> : null}
+					{formatRelativeTime(result.github_pushed_at)}
+				</span>
 			</div>
 		</motion.article>
 	);

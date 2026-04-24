@@ -1,11 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import AnswerCard from "../components/AnswerCard";
 import ClarificationCard from "../components/ClarificationCard";
 import EmptyState from "../components/EmptyState";
 import EnrichmentPill from "../components/EnrichmentPill";
+import FiltersPanel from "../components/FiltersPanel";
 import ResultCard from "../components/ResultCard";
 import SearchBar from "../components/SearchBar";
 import Sidebar from "../components/Sidebar";
@@ -17,6 +19,7 @@ type ViewState = "search" | "clarification" | "results";
 type RouteMode = "vector_search" | "web_search" | "clarify";
 
 export default function HomePage() {
+  const [theme, setTheme] = useState<"light" | "dark">("dark");
   const [viewState, setViewState] = useState<ViewState>("search");
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -180,10 +183,31 @@ export default function HomePage() {
     });
   }, [results, clientSearch, filterDomain, filterLanguage, filterArchived, filterFork, sortBy]);
 
+  useEffect(() => {
+    const stored = window.localStorage.getItem("alterssearch-theme");
+    if (stored === "light" || stored === "dark") {
+      setTheme(stored);
+      return;
+    }
+
+    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    setTheme(prefersDark ? "dark" : "light");
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+    window.localStorage.setItem("alterssearch-theme", theme);
+  }, [theme]);
+
   return (
-    <div className="app-shell bg-[radial-gradient(1200px_700px_at_70%_-20%,rgba(124,58,237,0.18),transparent_55%),radial-gradient(900px_500px_at_0%_20%,rgba(59,130,246,0.14),transparent_45%),#0a0a0a]">
-      <Topbar onToggleMobileNav={() => setMobileNavOpen((value) => !value)} />
-      <div className="content-shell">
+    <div className="app-shell relative overflow-hidden">
+      <div className="pointer-events-none absolute inset-0 opacity-[0.35] [background-image:radial-gradient(var(--grid-dot)_0.5px,transparent_0.5px)] [background-size:3px_3px]" />
+      <Topbar
+        onToggleMobileNav={() => setMobileNavOpen((value) => !value)}
+        theme={theme}
+        onToggleTheme={() => setTheme((value) => (value === "dark" ? "light" : "dark"))}
+      />
+      <div className="content-shell mx-auto w-full max-w-[1920px] gap-5 px-0">
         <Sidebar
           recentSearches={recentSearches}
           onSelectSearch={handleInitialSearch}
@@ -193,8 +217,14 @@ export default function HomePage() {
           activeQuery={originalQuery}
         />
 
-        <main className="main-area">
-          <div className="main-inner max-w-[760px] px-6 py-10 md:px-8">
+        <main className="main-area min-w-0">
+          <div
+            className={`main-inner px-6 py-10 md:px-8 ${
+              viewState === "results"
+                ? "mx-0 w-full max-w-none px-0 md:px-0"
+                : "mx-auto max-w-[780px]"
+            }`}
+          >
             {errorMessage ? (
               <motion.div className="error-banner" initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}>
                 {errorMessage}
@@ -238,7 +268,12 @@ export default function HomePage() {
 
               {viewState === "results" ? (
                 <motion.section key="results" className="result-area" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
-                  <h1 className="m-0 text-[24px] font-semibold tracking-tight text-zinc-100">{title}</h1>
+                  <div className="mb-1">
+                    <h1 className="m-0 text-[28px] font-semibold tracking-tight text-[var(--text-primary)]">{title}</h1>
+                    <p className="m-0 mt-2 text-sm text-[var(--text-secondary)]">
+                      Explore high-signal repositories with refined ranking and filters.
+                    </p>
+                  </div>
                   <SearchBar onSubmit={handleInitialSearch} isLoading={isLoading} routeMode={routeMode} />
 
                   {isLoading ? (
@@ -262,69 +297,22 @@ export default function HomePage() {
                         </div>
                       ) : (
                         <>
-                          <div className="rounded-2xl border border-white/10 bg-zinc-900/60 p-4 shadow-[0_8px_22px_rgba(0,0,0,0.35)]">
-                            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-                              <label className="flex flex-col gap-1">
-                                <span className="text-[12px] text-zinc-500">Search in results</span>
-                                <input
-                                  value={clientSearch}
-                                  onChange={(event) => setClientSearch(event.target.value)}
-                                  placeholder="repo name or description"
-                                  className="h-10 rounded-xl border border-white/10 bg-zinc-950 px-3 text-sm text-zinc-200 outline-none focus:border-violet-500"
-                                />
-                              </label>
-
-                              <label className="flex flex-col gap-1">
-                                <span className="text-[12px] text-zinc-500">Sort by</span>
-                                <select value={sortBy} onChange={(event) => setSortBy(event.target.value as typeof sortBy)} className="h-10 rounded-xl border border-white/10 bg-zinc-950 px-3 text-sm text-zinc-200 outline-none focus:border-violet-500">
-                                  <option value="stars">Stars</option>
-                                  <option value="forks">Forks</option>
-                                  <option value="pushed">Recently Pushed</option>
-                                  <option value="created">Recently Created</option>
-                                </select>
-                              </label>
-
-                              <label className="flex flex-col gap-1">
-                                <span className="text-[12px] text-zinc-500">Domain</span>
-                                <select value={filterDomain} onChange={(event) => setFilterDomain(event.target.value)} className="h-10 rounded-xl border border-white/10 bg-zinc-950 px-3 text-sm text-zinc-200 outline-none focus:border-violet-500">
-                                  {uniqueDomains.map((domain) => (
-                                    <option key={domain} value={domain}>
-                                      {domain}
-                                    </option>
-                                  ))}
-                                </select>
-                              </label>
-
-                              <label className="flex flex-col gap-1">
-                                <span className="text-[12px] text-zinc-500">Language</span>
-                                <select value={filterLanguage} onChange={(event) => setFilterLanguage(event.target.value)} className="h-10 rounded-xl border border-white/10 bg-zinc-950 px-3 text-sm text-zinc-200 outline-none focus:border-violet-500">
-                                  {uniqueLanguages.map((language) => (
-                                    <option key={language} value={language}>
-                                      {language}
-                                    </option>
-                                  ))}
-                                </select>
-                              </label>
-
-                              <label className="flex flex-col gap-1">
-                                <span className="text-[12px] text-zinc-500">Archived</span>
-                                <select value={filterArchived} onChange={(event) => setFilterArchived(event.target.value as typeof filterArchived)} className="h-10 rounded-xl border border-white/10 bg-zinc-950 px-3 text-sm text-zinc-200 outline-none focus:border-violet-500">
-                                  <option value="all">All</option>
-                                  <option value="yes">Archived only</option>
-                                  <option value="no">Exclude archived</option>
-                                </select>
-                              </label>
-
-                              <label className="flex flex-col gap-1">
-                                <span className="text-[12px] text-zinc-500">Forked</span>
-                                <select value={filterFork} onChange={(event) => setFilterFork(event.target.value as typeof filterFork)} className="h-10 rounded-xl border border-white/10 bg-zinc-950 px-3 text-sm text-zinc-200 outline-none focus:border-violet-500">
-                                  <option value="all">All</option>
-                                  <option value="yes">Forks only</option>
-                                  <option value="no">Exclude forks</option>
-                                </select>
-                              </label>
-                            </div>
-                          </div>
+                          <FiltersPanel
+                            sortBy={sortBy}
+                            setSortBy={setSortBy}
+                            filterDomain={filterDomain}
+                            setFilterDomain={setFilterDomain}
+                            filterLanguage={filterLanguage}
+                            setFilterLanguage={setFilterLanguage}
+                            filterArchived={filterArchived}
+                            setFilterArchived={setFilterArchived}
+                            filterFork={filterFork}
+                            setFilterFork={setFilterFork}
+                            clientSearch={clientSearch}
+                            setClientSearch={setClientSearch}
+                            uniqueDomains={uniqueDomains}
+                            uniqueLanguages={uniqueLanguages}
+                          />
 
                           {filteredResults.length === 0 ? (
                             <div className="empty-results">
@@ -335,7 +323,7 @@ export default function HomePage() {
                               <p>Try adjusting filters or search terms</p>
                             </div>
                           ) : (
-                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                            <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                               {filteredResults.map((result, index) => (
                                 <ResultCard key={`${result.url}-${index}`} result={result} index={index} />
                               ))}

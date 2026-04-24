@@ -3,25 +3,43 @@
 @tailwind utilities;
 
 :root {
-  --bg-base: #0a0a0a;
-  --bg-surface: #111111;
-  --bg-elevated: #1a1a1a;
-  --bg-border: #2a2a2a;
-  --text-primary: #f5f5f5;
-  --text-secondary: #a0a0a0;
-  --text-muted: #555555;
+  --bg-base: #f4f6fb;
+  --bg-surface: #ffffff;
+  --bg-elevated: #edf1f7;
+  --bg-border: #dbe1ee;
+  --text-primary: #111827;
+  --text-secondary: #4b5563;
+  --text-muted: #6b7280;
   --accent: #7c3aed;
-  --accent-soft: #7c3aed18;
+  --accent-soft: #7c3aed1c;
   --accent-hover: #6d28d9;
   --success: #22c55e;
   --warning: #f59e0b;
   --error: #ef4444;
+  --grid-dot: rgba(17, 24, 39, 0.26);
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 16px;
-  --shadow-subtle: 0 1px 3px rgba(0, 0, 0, 0.4);
-  --shadow-card: 0 4px 16px rgba(0, 0, 0, 0.5);
-  --shadow-elevated: 0 8px 32px rgba(0, 0, 0, 0.6);
+  --shadow-subtle: 0 2px 8px rgba(13, 24, 44, 0.06);
+  --shadow-card: 0 12px 28px rgba(13, 24, 44, 0.1);
+  --shadow-elevated: 0 18px 42px rgba(13, 24, 44, 0.14);
+}
+
+[data-theme="dark"] {
+  --bg-base: #0b0f1a;
+  --bg-surface: #121827;
+  --bg-elevated: #1a2235;
+  --bg-border: #2b354b;
+  --text-primary: #f8fafc;
+  --text-secondary: #9ba9c2;
+  --text-muted: #7183a2;
+  --accent: #8b5cf6;
+  --accent-soft: #8b5cf628;
+  --accent-hover: #7c3aed;
+  --grid-dot: rgba(255, 255, 255, 0.42);
+  --shadow-subtle: 0 2px 10px rgba(0, 0, 0, 0.35);
+  --shadow-card: 0 14px 34px rgba(0, 0, 0, 0.45);
+  --shadow-elevated: 0 18px 42px rgba(0, 0, 0, 0.6);
 }
 
 * {
@@ -35,6 +53,8 @@ body {
   background: var(--bg-base);
   color: var(--text-primary);
   font-family: var(--font-primary), Inter, sans-serif;
+  transition: background-color 0.25s ease, color 0.25s ease;
+  overflow: hidden;
 }
 
 button,
@@ -59,7 +79,10 @@ a:focus-visible {
 
 .app-shell {
   min-height: 100vh;
-  background: var(--bg-base);
+  background:
+    radial-gradient(1200px 700px at 70% -20%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 55%),
+    radial-gradient(900px 500px at 0% 20%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 45%),
+    var(--bg-base);
 }
 
 .topbar {
@@ -68,7 +91,7 @@ a:focus-visible {
   z-index: 50;
   height: 56px;
   border-bottom: 1px solid var(--bg-border);
-  background: color-mix(in srgb, var(--bg-base) 88%, transparent);
+  background: color-mix(in srgb, var(--bg-base) 84%, transparent);
   backdrop-filter: blur(12px);
   display: flex;
   align-items: center;
@@ -157,7 +180,8 @@ a:focus-visible {
 .sidebar {
   width: 240px;
   border-right: 1px solid var(--bg-border);
-  background: var(--bg-surface);
+  background: color-mix(in srgb, var(--bg-surface) 90%, transparent);
+  backdrop-filter: blur(14px);
   position: sticky;
   top: 56px;
   max-height: calc(100vh - 56px);
@@ -165,6 +189,13 @@ a:focus-visible {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.sidebar::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 .sidebar-section {
@@ -256,13 +287,20 @@ a:focus-visible {
   flex: 1;
   max-height: calc(100vh - 56px);
   overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.main-area::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 .main-inner {
   width: 100%;
-  max-width: 720px;
-  margin: 0 auto;
-  padding: 40px 24px;
+  max-width: none;
+  margin: 0;
+  padding: 0;
 }
 
 .landing-wrap {
@@ -624,7 +662,7 @@ a:focus-visible {
 .error-banner {
   border: 1px solid color-mix(in srgb, var(--error) 45%, var(--bg-border));
   background: color-mix(in srgb, var(--error) 12%, transparent);
-  color: #ffc4c4;
+  color: color-mix(in srgb, var(--error) 70%, var(--text-primary));
   border-radius: var(--radius-md);
   padding: 12px 16px;
   font-size: 14px;
@@ -695,10 +733,6 @@ a:focus-visible {
 
   .feedback-text {
     display: none;
-  }
-
-  .main-inner {
-    padding: 24px 16px;
   }
 
   .search-input-wrap {

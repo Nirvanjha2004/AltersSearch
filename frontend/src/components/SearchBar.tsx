@@ -2,6 +2,7 @@
 
 import { FormEvent, KeyboardEvent, useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
+import { Search, Sparkles, Send } from "lucide-react";
 
 type RouteMode = "vector_search" | "web_search" | "clarify";
 
@@ -68,16 +69,15 @@ export default function SearchBar({
 			animate={{ opacity: 1, y: 0 }}
 			transition={{ duration: 0.24, ease: "easeOut" }}
 		>
-			<div className="group w-full rounded-2xl border border-white/10 bg-zinc-950/70 p-4 shadow-[0_8px_28px_rgba(0,0,0,0.45)] backdrop-blur-xl transition-all duration-200 focus-within:border-violet-500/60 focus-within:shadow-[0_0_0_3px_rgba(124,58,237,0.14),0_14px_40px_rgba(0,0,0,0.6)]">
-				<div className="mb-3 flex items-start gap-3">
-					<span className="mt-0.5 text-zinc-500" aria-hidden="true">
-						<svg viewBox="0 0 24 24" width="18" height="18">
-							<path d="m15.5 15.5 4 4M10 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16Z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-						</svg>
+			<div className="group relative w-full overflow-hidden rounded-2xl border border-white/10 bg-[color:color-mix(in_srgb,var(--bg-surface)_88%,transparent)] px-5 py-4 shadow-[var(--shadow-elevated)] backdrop-blur-xl transition-all duration-200 ease-out focus-within:border-[color:color-mix(in_srgb,var(--accent)_60%,transparent)] focus-within:shadow-[0_0_0_3px_var(--accent-soft),var(--shadow-elevated)]">
+				<div className="pointer-events-none absolute inset-0 bg-[radial-gradient(700px_180px_at_50%_-60%,rgba(139,92,246,0.14),transparent_60%)]" />
+				<div className="mb-4 flex items-start gap-3">
+					<span className="mt-0.5 text-[var(--text-secondary)] transition-colors duration-200 group-focus-within:text-[var(--accent)]" aria-hidden="true">
+						<Search size={17} />
 					</span>
 					<textarea
 						ref={textareaRef}
-						className="max-h-[152px] min-h-[24px] w-full resize-none bg-transparent text-[16px] leading-7 tracking-[-0.01em] text-zinc-100 outline-none placeholder:text-zinc-500"
+						className="relative z-10 max-h-[152px] min-h-[24px] w-full resize-none bg-transparent text-[16px] leading-7 tracking-[-0.01em] text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)]"
 						placeholder="Search for a repo, library, or ask anything..."
 						value={query}
 						onChange={(event) => setQuery(event.target.value)}
@@ -88,18 +88,19 @@ export default function SearchBar({
 					/>
 				</div>
 
-				<div className="flex items-center justify-between">
-					<span className="rounded-full border border-violet-500/30 bg-violet-500/10 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.08em] text-violet-300">
+				<div className="flex items-center justify-between border-t border-white/10 pt-3">
+					<span className="inline-flex items-center gap-1.5 rounded-full border border-[color:color-mix(in_srgb,var(--accent)_32%,transparent)] bg-[var(--accent-soft)] px-3 py-1 text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--accent)]">
+						<Sparkles size={12} />
 						{modeLabel}
 					</span>
 					<motion.button
 						type="submit"
 						disabled={isLoading || !query.trim()}
-						className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-violet-600 text-base text-white shadow-[0_6px_18px_rgba(109,40,217,0.45)] transition disabled:cursor-not-allowed disabled:opacity-40"
+						className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[color:color-mix(in_srgb,var(--accent)_45%,transparent)] bg-[linear-gradient(145deg,var(--accent),var(--accent-hover))] text-base text-white shadow-[0_8px_20px_rgba(139,92,246,0.35)] transition duration-200 ease-out disabled:cursor-not-allowed disabled:opacity-40"
 						whileHover={isLoading || !query.trim() ? undefined : { scale: 1.03, filter: "brightness(1.08)" }}
 						whileTap={isLoading || !query.trim() ? undefined : { scale: 0.97 }}
 					>
-						{isLoading ? <span className="spinner" aria-hidden="true" /> : "↑"}
+						{isLoading ? <span className="spinner" aria-hidden="true" /> : <Send size={16} />}
 					</motion.button>
 				</div>
 			</div>

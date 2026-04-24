@@ -5,7 +5,7 @@ type SkeletonCardProps = {
 export default function SkeletonCard({ index }: SkeletonCardProps) {
   return (
     <div
-      className="overflow-hidden rounded-2xl border border-white/10 bg-zinc-900/60 p-5"
+      className="overflow-hidden rounded-2xl border border-[var(--bg-border)] bg-[var(--bg-surface)] p-5"
       style={{ animationDelay: `${index * 90}ms` }}
       aria-hidden="true"
     >
