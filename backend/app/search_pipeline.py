@@ -433,6 +433,7 @@ async def process_search_query(request: SearchRequest) -> dict[str, Any]:
             "status": "clarification_needed",
             "action": "clarify",
             "message": decision.clarification_question,
+            "enriched_query": "",
             "results": [],
             "answer": None,
         }
@@ -455,6 +456,7 @@ async def process_search_query(request: SearchRequest) -> dict[str, Any]:
                 "status": "success",
                 "action": "web_search",
                 "message": f"{len(raw_results)} web result(s) found.",
+                "enriched_query": optimized_query,
                 "results": ui_results,
                 "answer": answer,
             }
@@ -464,6 +466,7 @@ async def process_search_query(request: SearchRequest) -> dict[str, Any]:
                 "status": "error",
                 "action": "web_search",
                 "message": "Web search failed. Please try again.",
+                "enriched_query": optimized_query,
                 "results": [],
                 "answer": None,
             }

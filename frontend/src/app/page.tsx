@@ -1,161 +1,221 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import ClarificationPrompt from "../components/ClarificationPrompt";
+import AnswerCard from "../components/AnswerCard";
+import ClarificationCard from "../components/ClarificationCard";
+import EmptyState from "../components/EmptyState";
+import EnrichmentPill from "../components/EnrichmentPill";
 import ResultCard from "../components/ResultCard";
 import SearchBar from "../components/SearchBar";
+import Sidebar from "../components/Sidebar";
+import SkeletonCard from "../components/SkeletonCard";
+import Topbar from "../components/Topbar";
 import type { AgentResponse, SearchRequest, SearchResult } from "../types";
 
 type ViewState = "search" | "clarification" | "results";
+type RouteMode = "vector_search" | "web_search" | "clarify";
 
 export default function HomePage() {
-    const [viewState, setViewState] = useState<ViewState>("search");
-    const [isLoading, setIsLoading] = useState(false);
-    const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [viewState, setViewState] = useState<ViewState>("search");
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
-    const [originalQuery, setOriginalQuery] = useState("");
-    const [clarificationQuestion, setClarificationQuestion] = useState("");
-    const [results, setResults] = useState<SearchResult[]>([]);
+  const [originalQuery, setOriginalQuery] = useState("");
+  const [clarificationQuestion, setClarificationQuestion] = useState("");
+  const [clarificationPrefill, setClarificationPrefill] = useState("");
+  const [results, setResults] = useState<SearchResult[]>([]);
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [answer, setAnswer] = useState<string | null>(null);
+  const [routeMode, setRouteMode] = useState<RouteMode>("vector_search");
+  const [enrichedQuery, setEnrichedQuery] = useState("");
 
-    // Dynamic Title Logic
-    const title = useMemo(() => {
-        if (viewState === "clarification") return "Need one more detail";
-        if (viewState === "results") return "Search results";
-        return "Open Source Search";
-    }, [viewState]);
+  const title = useMemo(() => {
+    if (viewState === "clarification") {
+      return "Need one more detail";
+    }
+    if (viewState === "results") {
+      return "Search results";
+    }
+    return "Open Source Search";
+  }, [viewState]);
 
-    // API Caller Utility
-    const callSearchApi = async (payload: SearchRequest): Promise<AgentResponse> => {
-        const response = await fetch("http://localhost:8000/api/search", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify(payload),
-        });
+  const pushRecentSearch = (query: string) => {
+    setRecentSearches((previous) => [query, ...previous.filter((item) => item !== query)].slice(0, 12));
+  };
 
-        if (!response.ok) {
-            throw new Error(`Search API failed with status ${response.status}`);
-        }
+  const callSearchApi = async (payload: SearchRequest): Promise<AgentResponse> => {
+    const response = await fetch("http://localhost:8000/api/search", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
 
-        return (await response.json()) as AgentResponse;
-    };
+    if (!response.ok) {
+      throw new Error(`Search API failed with status ${response.status}`);
+    }
 
-    // Handler 1: Initial user search
-    const handleInitialSearch = async (query: string) => {
-        setIsLoading(true);
-        setErrorMessage(null);
-        setOriginalQuery(query); // Store the first intent
+    return (await response.json()) as AgentResponse;
+  };
 
-        try {
-            const data = await callSearchApi({ query });
+  const applyResponse = (data: AgentResponse, fallbackQuery: string) => {
+    setRouteMode((data.action as RouteMode) || "vector_search");
+    setEnrichedQuery(data.enriched_query || "");
+    setAnswer(data.answer || null);
 
-            // SYNCED: Matches backend "clarification_needed" status
-            if (data.status === "clarification_needed") {
-                setClarificationQuestion(data.message || "Could you clarify your search?");
-                setViewState("clarification");
-                setResults([]);
-                return;
-            }
+    if (data.status === "clarification_needed") {
+      const question = data.message || "Could you be more specific?";
+      const prefill = `Original intent: ${fallbackQuery}. Clarification: `;
+      setClarificationQuestion(question);
+      setClarificationPrefill(prefill);
+      setViewState("clarification");
+      setResults([]);
+      return;
+    }
 
-            setResults(data.results ?? []);
-            setViewState("results");
-        } catch (err) {
-            setErrorMessage("Could not reach the backend. Ensure FastAPI is running on port 8000.");
-        } finally {
-            setIsLoading(false);
-        }
-    };
+    if (data.status === "error") {
+      setErrorMessage(data.message || "Search failed. Please try again.");
+      setResults([]);
+      setViewState("results");
+      return;
+    }
 
-    // Handler 2: Submitting the clarification answer
-    const handleClarificationSubmit = async (answer: string) => {
-        setIsLoading(true);
-        setErrorMessage(null);
+    setResults(data.results ?? []);
+    setViewState("results");
+  };
 
-        try {
-            // THE CONTEXT LOOP: We combine the original query with the new answer
-            // This ensures the LLM 'remembers' the unsiloed ai part.
-            const combinedQuery = `Original intent: ${originalQuery}. Clarification: ${answer}`;
-            
-            const data = await callSearchApi({ query: combinedQuery });
+  const runSearch = async (query: string, options?: { preserveOriginal?: boolean }) => {
+    setIsLoading(true);
+    setErrorMessage(null);
+    setMobileNavOpen(false);
 
-            if (data.status === "clarification_needed") {
-                // If the LLM is still confused, we stay in this state with the new question
-                setClarificationQuestion(data.message || "I still need a bit more detail.");
-                return;
-            }
+    if (!options?.preserveOriginal) {
+      setOriginalQuery(query);
+    }
+    pushRecentSearch(query);
 
-            setResults(data.results ?? []);
-            setViewState("results");
-        } catch (err) {
-            setErrorMessage("Unable to submit clarification. Please try again.");
-        } finally {
-            setIsLoading(false);
-        }
-    };
+    try {
+      const data = await callSearchApi({ query });
+      applyResponse(data, options?.preserveOriginal ? originalQuery : query);
+    } catch {
+      setErrorMessage("Could not reach the backend. Ensure FastAPI is running on port 8000.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-    return (
-        <main className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(63,63,70,0.2),transparent_55%),linear-gradient(180deg,#09090b_0%,#0a0a0a_100%)] text-zinc-100">
-            <div className="mx-auto flex min-h-screen w-full max-w-6xl flex-col px-6 py-12 sm:px-10">
-                
-                <header className="mb-10">
-                    <p className="text-xs font-medium uppercase tracking-[0.25em] text-zinc-500">AltersSearch</p>
-                    <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl transition-all duration-500">{title}</h1>
-                </header>
+  const handleInitialSearch = async (query: string) => {
+    await runSearch(query);
+  };
 
-                {errorMessage && (
-                    <div className="mb-6 rounded-xl border border-red-900/60 bg-red-950/40 px-4 py-3 text-sm text-red-200 animate-in fade-in zoom-in duration-300">
-                        {errorMessage}
-                    </div>
+  const handleClarificationSearch = async (query: string) => {
+    await runSearch(query, { preserveOriginal: true });
+  };
+
+  const handleSuggestion = async (suggestion: string) => {
+    await handleInitialSearch(suggestion);
+  };
+
+  const resetSearch = () => {
+    setViewState("search");
+    setResults([]);
+    setErrorMessage(null);
+    setAnswer(null);
+    setEnrichedQuery("");
+    setRouteMode("vector_search");
+  };
+
+  const sourceForAnswer = results.find((item) => item.url)?.url;
+
+  return (
+    <div className="app-shell">
+      <Topbar onToggleMobileNav={() => setMobileNavOpen((value) => !value)} />
+      <div className="content-shell">
+        <Sidebar
+          recentSearches={recentSearches}
+          onSelectSearch={handleInitialSearch}
+          onNewSearch={resetSearch}
+          isMobileOpen={mobileNavOpen}
+          onCloseMobile={() => setMobileNavOpen(false)}
+        />
+
+        <main className="main-area">
+          <div className="main-inner">
+            {errorMessage ? <div className="error-banner">{errorMessage}</div> : null}
+
+            {viewState === "search" ? (
+              <div className="landing-wrap">
+                <EmptyState onSuggestionClick={handleSuggestion} />
+                <SearchBar onSubmit={handleInitialSearch} isLoading={isLoading} routeMode={routeMode} autoFocus />
+                {isLoading ? (
+                  <div className="skeleton-stack">
+                    {[0, 1, 2].map((index) => (
+                      <SkeletonCard key={index} index={index} />
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
+            {viewState === "clarification" ? (
+              <section className="result-area">
+                <ClarificationCard question={clarificationQuestion} />
+                <SearchBar
+                  onSubmit={handleClarificationSearch}
+                  isLoading={isLoading}
+                  routeMode="clarify"
+                  initialValue={clarificationPrefill}
+                  autoFocus
+                />
+                {isLoading ? (
+                  <div className="skeleton-stack">
+                    {[0, 1, 2].map((index) => (
+                      <SkeletonCard key={index} index={index} />
+                    ))}
+                  </div>
+                ) : null}
+              </section>
+            ) : null}
+
+            {viewState === "results" ? (
+              <section className="result-area">
+                <h1 className="empty-tagline" style={{ margin: 0 }}>{title}</h1>
+                <SearchBar onSubmit={handleInitialSearch} isLoading={isLoading} routeMode={routeMode} />
+
+                {isLoading ? (
+                  <div className="skeleton-stack">
+                    {[0, 1, 2].map((index) => (
+                      <SkeletonCard key={index} index={index} />
+                    ))}
+                  </div>
+                ) : (
+                  <>
+                    {enrichedQuery ? <EnrichmentPill query={enrichedQuery} /> : null}
+
+                    {answer ? <AnswerCard answer={answer} source={sourceForAnswer} /> : null}
+
+                    {results.length === 0 ? (
+                      <div className="empty-results">
+                        <svg viewBox="0 0 24 24" width="40" height="40" aria-hidden="true" style={{ color: "var(--text-muted)" }}>
+                          <path d="m15.5 15.5 4 4M10 18a8 8 0 1 1 5.3-14l-2.5 2.6M9 9h6m-6 4h4" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                        <h3>No results found</h3>
+                        <p>Try a different query or search the web</p>
+                      </div>
+                    ) : (
+                      <div className="results-grid">
+                        {results.map((result, index) => (
+                          <ResultCard key={`${result.url}-${index}`} result={result} index={index} />
+                        ))}
+                      </div>
+                    )}
+                  </>
                 )}
-
-                {/* Initial Search View */}
-                {viewState === "search" && (
-                    <section className="flex flex-1 items-center justify-center animate-in fade-in slide-in-from-bottom-8 duration-700">
-                        <div className="w-full max-w-3xl">
-                            <SearchBar onSubmit={handleInitialSearch} isLoading={isLoading} />
-                        </div>
-                    </section>
-                )}
-
-                {/* Clarification Interception View */}
-                {viewState === "clarification" && (
-                    <section className="mx-auto w-full max-w-2xl pt-12 animate-in fade-in slide-in-from-bottom-8 duration-500">
-                        <ClarificationPrompt
-                            question={clarificationQuestion}
-                            onSubmit={handleClarificationSubmit}
-                            isLoading={isLoading}
-                        />
-                        <button 
-                            onClick={() => setViewState("search")}
-                            className="mt-6 text-sm text-zinc-500 hover:text-zinc-300 transition-colors"
-                        >
-                            ← Back to initial search
-                        </button>
-                    </section>
-                )}
-
-                {/* Results View */}
-                {viewState === "results" && (
-                    <section className="space-y-8 animate-in fade-in duration-500">
-                        <div className="w-full max-w-3xl">
-                            <SearchBar onSubmit={handleInitialSearch} isLoading={isLoading} buttonLabel="Search" />
-                        </div>
-
-                        {results.length === 0 ? (
-                            <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 px-5 py-20 text-center text-zinc-400">
-                                <p>No repositories found. Try refining your search query.</p>
-                            </div>
-                        ) : (
-                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-                                {results.map((result: SearchResult) => (
-                                    <ResultCard key={result.url} result={result} />
-                                ))}
-                            </div>
-                        )}
-                    </section>
-                )}
-            </div>
+              </section>
+            ) : null}
+          </div>
         </main>
-    );
+      </div>
+    </div>
+  );
 }

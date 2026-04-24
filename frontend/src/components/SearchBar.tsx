@@ -1,50 +1,84 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, KeyboardEvent, useEffect, useRef, useState } from "react";
+
+type RouteMode = "vector_search" | "web_search" | "clarify";
 
 type SearchBarProps = {
 	onSubmit: (query: string) => Promise<void> | void;
 	isLoading?: boolean;
-	placeholder?: string;
-	buttonLabel?: string;
+	initialValue?: string;
+	routeMode?: RouteMode;
+	autoFocus?: boolean;
 };
 
 export default function SearchBar({
 	onSubmit,
 	isLoading = false,
-	placeholder = "Search open-source repos, tools, or patterns...",
-	buttonLabel = "Search",
+	initialValue = "",
+	routeMode = "vector_search",
+	autoFocus = false,
 }: SearchBarProps) {
-	const [query, setQuery] = useState("");
+	const [query, setQuery] = useState(initialValue);
+	const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
-	const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-		event.preventDefault();
+	useEffect(() => {
+		setQuery(initialValue);
+	}, [initialValue]);
+
+	useEffect(() => {
+		if (!textareaRef.current) {
+			return;
+		}
+		const el = textareaRef.current;
+		el.style.height = "auto";
+		const nextHeight = Math.min(el.scrollHeight, 152);
+		el.style.height = `${nextHeight}px`;
+	}, [query]);
+
+	const handleSubmit = async (event?: FormEvent) => {
+		event?.preventDefault();
 		const trimmed = query.trim();
 		if (!trimmed || isLoading) {
 			return;
 		}
-
 		await onSubmit(trimmed);
 	};
 
+	const onKeyDown = async (event: KeyboardEvent<HTMLTextAreaElement>) => {
+		if (event.key === "Enter" && !event.shiftKey) {
+			event.preventDefault();
+			await handleSubmit();
+		}
+	};
+
+	const modeLabel =
+		routeMode === "web_search"
+			? "Web Search"
+			: routeMode === "clarify"
+				? "Clarification"
+				: "Vector Search";
+
 	return (
-		<form onSubmit={handleSubmit} className="w-full">
-			<div className="flex w-full items-center gap-3 rounded-2xl border border-zinc-800 bg-zinc-900/80 p-2 shadow-[0_0_0_1px_rgba(255,255,255,0.02)] backdrop-blur">
-				<input
-					type="text"
+		<form className="search-shell" onSubmit={handleSubmit}>
+			<div className="search-input-wrap">
+				<textarea
+					ref={textareaRef}
+					className="search-textarea"
+					placeholder="Search for a repo, library, or ask anything..."
 					value={query}
 					onChange={(event) => setQuery(event.target.value)}
-					placeholder={placeholder}
-					className="h-12 w-full rounded-xl bg-zinc-950 px-4 text-sm text-zinc-100 outline-none ring-0 placeholder:text-zinc-500 focus:bg-zinc-900"
+					onKeyDown={onKeyDown}
+					rows={1}
+					autoFocus={autoFocus}
 					aria-label="Search query"
 				/>
-				<button
-					type="submit"
-					disabled={isLoading}
-					className="h-12 min-w-28 rounded-xl bg-zinc-100 px-5 text-sm font-medium text-zinc-900 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
-				>
-					{isLoading ? "Thinking..." : buttonLabel}
-				</button>
+				<div className="search-bottom-row">
+					<span className="mode-pill">{modeLabel}</span>
+					<button className="send-btn" type="submit" disabled={isLoading || !query.trim()}>
+						{isLoading ? <span className="spinner" aria-hidden="true" /> : "↑"}
+					</button>
+				</div>
 			</div>
 		</form>
 	);
