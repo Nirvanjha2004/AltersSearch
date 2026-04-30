@@ -12,6 +12,17 @@ Thumbs.db
 backend/.env
 frontend/.env.local
 
+# venv
+# Virtual Environments
+**/myenv/
+myvenv/
+.myvenv/
+env/
+bin/
+include/
+lib/
+share/
+pyvenv.cfg
 # Python
 __pycache__/
 *.py[cod]
