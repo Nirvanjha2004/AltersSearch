@@ -6,7 +6,7 @@ Implement dual-token JWT authentication across repo-api (Node.js/Express) and th
 
 ## Tasks
 
-- [-] 1. Install dependencies and configure environment variables
+- [x] 1. Install dependencies and configure environment variables
   - Install `bcryptjs`, `jsonwebtoken`, `jest`, `supertest`, and `fast-check` in `repo-api`
   - Install `vitest`, `@vitest/coverage-v8`, `@testing-library/react`, `@testing-library/jest-dom`, `@testing-library/user-event`, `msw`, and `fast-check` in `frontend`
   - Add `JWT_SECRET` and `JWT_EXPIRES_IN=900` to `repo-api/.env.example` and local `.env`
@@ -15,7 +15,7 @@ Implement dual-token JWT authentication across repo-api (Node.js/Express) and th
   - _Requirements: 1.1, 2.1, 2.4, 2.5_
 
 - [ ] 2. Implement backend data stores and utilities
-  - [~] 2.1 Create `repo-api/src/auth/userStore.js` with `UserStore` class
+  - [x] 2.1 Create `repo-api/src/auth/userStore.js` with `UserStore` class
     - Implement `create(email, passwordHash)`, `findByEmail(email)`, `findById(id)` methods
     - Use `crypto.randomUUID()` for user ids; store email as lowercase trimmed
     - _Requirements: 1.1, 1.5_
@@ -25,17 +25,17 @@ Implement dual-token JWT authentication across repo-api (Node.js/Express) and th
     - **Validates: Requirements 1.1, 1.5**
     - File: `repo-api/src/auth/__tests__/register.property.test.js`
 
-  - [~] 2.3 Create `repo-api/src/auth/tokenStore.js` with `TokenStore` class
+  - [x] 2.3 Create `repo-api/src/auth/tokenStore.js` with `TokenStore` class
     - Implement `save(token, { userId, expiresAt })`, `find(token)`, `revoke(token)` methods
     - _Requirements: 2.5, 3.1, 4.1_
 
-  - [~] 2.4 Create `repo-api/src/auth/utils.js` with helper functions
+  - [x] 2.4 Create `repo-api/src/auth/utils.js` with helper functions
     - Implement `generateRefreshToken()` — `crypto.randomBytes(64).toString('hex')`
     - Implement `getInitials(email)` — uppercase first char of local part
     - _Requirements: 2.5, 10.1_
 
 - [ ] 3. Implement backend auth handlers
-  - [~] 3.1 Create `repo-api/src/auth/handlers.js` with `register` handler
+  - [-] 3.1 Create `repo-api/src/auth/handlers.js` with `register` handler
     - Validate email format and password length (≥ 8 chars); return 400 on failure
     - Return 409 if email already exists
     - Hash password with `bcryptjs` at cost factor 12; store user; return 201 `{ id, email }`
