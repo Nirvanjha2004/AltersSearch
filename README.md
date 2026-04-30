@@ -1,124 +1,149 @@
 # AltersSearch
 
-> A developer-friendly code search and repository insight tool.
+> A full-stack open source search app for discovering software repositories, surfacing metadata, and answering search queries with AI-assisted routing.
 
-## Table of Contents
+## What This Project Does
 
-- **Project Overview**: What AltersSearch is and why it exists
-- **Architecture**: High-level components and responsibilities
-- **Repository Layout**: Key folders and files
-- **Local Setup**: Environment, running locally, and Docker
-- **Usage**: API endpoints and examples
-- **Development**: Tests, linting, and workflows
-- **Deployment**: Docker and production notes
-- **Future Enhancements**: Planned improvements and roadmap
-- **Contributing**: How to help
-- **License & Contact**: Project license and maintainer
+AltersSearch combines a modern search UI, a FastAPI backend, a Supabase vector index, and supporting repo metadata services to help users discover relevant open-source projects quickly.
 
-## Project Overview
+At a high level, the app can:
 
-AltersSearch is a developer-facing project that indexes and searches code and repository metadata to provide fast repository insights and search results. It combines a Next.js frontend, a Python backend for search pipelines and ingestion, and a small Node.js `repo-api` service to fetch additional GitHub repository details on demand.
+- route queries between local vector search and web search
+- enrich ambiguous entities with web lookup and LLM synthesis
+- rank repositories by stars, forks, recency, language, and archived/fork filters
+- fetch repository metadata like README, languages, and contributors
 
-Goals:
+## Tech Stack
 
-- Fast, focused code search UX
-- Lightweight repository metadata API with caching
-- Modular ingestion and workers for background sync
+Frontend:
 
-Use cases:
+- Next.js 14
+- React 18
+- TypeScript
+- Tailwind CSS
+- Framer Motion
+- React Markdown, `remark-gfm`, `rehype-raw`, `rehype-slug`
+- Lucide React icons
 
-- Quickly preview repository README, languages, and contributors
-- Run search queries across ingested code and metadata
-- Integrate results into a web UI for exploration
+Backend:
+
+- FastAPI
+- Uvicorn
+- Pydantic v2
+- LangChain Core
+- LangChain Groq
+- LangChain Hugging Face
+- sentence-transformers
+- httpx
+- loguru
+- Supabase Python client
+
+Supporting services:
+
+- Node.js + Express repo API in `repo-api/`
+- GitHub REST API for repository metadata
+- Serper.dev Google Search API for web lookup
+- Supabase Postgres + pgvector for semantic search
+
+Infrastructure:
+
+- Docker and Docker Compose
+- SQL migrations in `backend/supabase/migrations/`
+- Background ingestion scripts in `workers/`
 
 ## Architecture
 
-High-level components:
+The repository is organized around three primary flows:
 
-- **frontend/** — Next.js app that provides the UI and client-side integration with backend APIs.
-- **backend/** — Python FastAPI (or similar) app that hosts the search pipeline, APIs, and ingestion logic. Contains the `app/` package with core services and a `myenv/` virtual environment (for local development).
-- **repo-api/** — Small Node.js Express service that fetches GitHub repository details (README, languages, contributors) with caching and rate-limit handling.
-- **workers/** — Background jobs for ingesting data (e.g., `github_ingest.py`).
-- **supabase/** — SQL migrations and database schema used for persistent storage (if applicable).
-- **docker-compose.yml** — Orchestrates services for local development.
+1. Search requests start in the Next.js frontend.
+2. The FastAPI backend routes the query, either to vector search or web search, and may return a clarification prompt when the query is ambiguous.
+3. Repo metadata is fetched from GitHub and merged into search results or repo detail views.
 
-Data flow (simplified):
+The most important backend pieces are:
 
-1. Worker ingests repository content and stores/updates index.
-2. Backend APIs query the index and return ranked results.
-3. Frontend queries backend APIs and displays results; requests extra repo details from `repo-api` as needed.
+- `backend/app/main.py` for API routes
+- `backend/app/search_pipeline.py` for query routing, web search, enrichment, and LLM synthesis
+- `backend/app/database.py` for Supabase pgvector retrieval
+- `backend/app/schemas.py` for request and response models
+- `backend/app/logger.py` for structured logging
+
+The frontend centers on:
+
+- `frontend/src/app/page.tsx` for the main search experience
+- `frontend/src/components/` for the result cards, filters, sidebar, search bar, and answer/clarification UI
 
 ## Repository Layout
 
-- `frontend/` — Next.js UI
-- `backend/` — Python backend and search pipeline (see `backend/app/`)
-- `repo-api/` — Node.js Express helper service for repository metadata
-- `workers/` — Background ingestion scripts
-- `supabase/migrations/` — SQL migrations
-- `graphify-out/` — Generated architecture/graph reports
+- `frontend/` - Search UI and client-side filtering/sorting
+- `backend/` - FastAPI app, search pipeline, database access, and API logic
+- `repo-api/` - Standalone Express repo metadata helper service
+- `workers/` - Ingestion and sync scripts
+- `supabase/` - Database migrations
+- `docker-compose.yml` - Local orchestration for the stack
+- `graphify-out/` - Architecture graph artifacts and reports
 
-Key files:
+Important files:
 
-- `backend/app/main.py` — Backend server entry
-- `backend/app/search_pipeline.py` — Search pipeline and ranking logic
-- `repo-api/src/server.js` — Repo metadata API server
-- `workers/github_ingest.py` — GitHub ingestion worker
-- `docker-compose.yml` — Local orchestration
+- `frontend/src/app/page.tsx` - main application shell and search flow
+- `frontend/src/components/ResultCard.tsx` - repository result presentation
+- `backend/app/main.py` - `/api/search` and repo metadata endpoint
+- `backend/app/search_pipeline.py` - router, enrichment, and web search logic
+- `backend/app/database.py` - Supabase vector query implementation
+- `backend/app/schemas.py` - request and response schemas
+- `repo-api/src/server.js` - Express repo metadata service
+- `workers/github_ingest.py` - Background ingestion worker. It polls the `ingestion_queue` table, fetches repos from the GitHub Search API, prepares a text document for each repo by concatenating the repository description, name, and topics, computes a 384-dimensional semantic embedding via a local `sentence-transformers` model (`all-MiniLM-L6-v2`), and upserts the complete metadata and vector into the Supabase `repos` table.
+
+## Current Features
+
+- AI-assisted query routing between `web_search`, `vector_search`, and `clarify`
+- Clarification flow when the query has too little technical signal
+- Web enrichment for unknown entities before vector search
+- Repo result filtering by domain, language, archived state, and fork state
+- Sorting by stars, forks, last pushed time, or creation time
+- Recent searches and theme persistence in local storage
+- GitHub repository detail fetching with README, languages, and contributors
 
 ## Local Setup
 
 Prerequisites:
 
-- Node.js 18+ and npm/yarn
-- Python 3.10+ and `venv` (or use the provided `backend/myenv` for reference)
-- Docker & Docker Compose (optional, recommended for full-stack local run)
+- Node.js 20+ recommended for the frontend and repo API
+- Python 3.10+ for the backend and workers
+- Docker and Docker Compose if you want to run the full stack locally
 
-Environment variables (examples):
+Environment variables you will likely need:
 
-- `GITHUB_TOKEN` — GitHub API token (optional but recommended to avoid strict rate limits)
-- `FRONTEND_ORIGIN` — Allowed CORS origin for `repo-api` (defaults to `http://localhost:3000`)
-- `PORT` — Port for `repo-api` (defaults to `4000`)
-- `REPO_CACHE_TTL_MS` — Milliseconds to cache repo API responses (defaults to 5 minutes)
+- `GROQ_API_KEY` - required for LLM routing, enrichment, and answer synthesis
+- `GROQ_MODEL` - optional Groq model override, defaults to `llama-3.3-70b-versatile`
+- `SERPER_API_KEY` - optional but needed for live web enrichment/search
+- `EMBEDDING_MODEL` - optional Hugging Face embedding model override
+- `SUPABASE_URL` - Supabase project URL
+- `SUPABASE_SERVICE_ROLE_KEY` or `SUPABASE_ANON_KEY` - Supabase auth key
+- `SUPABASE_VECTOR_SEARCH_RPC` - optional RPC name, defaults to `match_repos_vector`
+- `VECTOR_MATCH_COUNT` - number of vector search results to return
+- `GITHUB_TOKEN` - optional GitHub token for repo metadata endpoints
+- `PORT` - repo-api port, defaults to `4000`
+- `FRONTEND_ORIGIN` - allowed CORS origin for repo-api
 
-Backend (Python) setup (recommended):
-
-1. Create and activate virtualenv:
+Backend setup:
 
 ```bash
+cd backend
 python -m venv .venv
-source .venv/Scripts/activate  # Windows: .venv\Scripts\activate
+.venv\Scripts\activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8000
 ```
 
-2. Install dependencies:
-
-```bash
-pip install -r backend/requirements.txt
-```
-
-3. Run the backend (example):
-
-```bash
-# from backend/
-python -m app.main
-```
-
-Repo API (Node) setup:
-
-1. Install dependencies and run:
+Repo metadata service setup:
 
 ```bash
 cd repo-api
 npm install
-node src/server.js
+npm run dev
 ```
 
-Or run with environment variables:
-
-```bash
-GITHUB_TOKEN=ghp_xxx PORT=4000 node src/server.js
-```
-
-Frontend (Next.js):
+Frontend setup:
 
 ```bash
 cd frontend
@@ -126,95 +151,85 @@ npm install
 npm run dev
 ```
 
-Docker (all services):
+Docker Compose:
 
 ```bash
 docker compose up --build
 ```
 
-## Usage
+## API Endpoints
 
-Repo API endpoints:
+Backend:
 
-- `GET /api/repo/:owner/:repo` — Returns JSON with `repo`, `languages`, `contributors`, and `readme` fields. Uses caching to limit GitHub API calls.
-- `GET /health` — Simple health check (returns `{ status: 'ok' }`).
+- `POST /api/search` - accepts `SearchRequest` with `query` and optional `context`
+- `GET /api/repo/{owner}/{repo}` - returns repo metadata, languages, contributors, and README text
+
+Repo API:
+
+- `GET /api/repo/:owner/:repo` - same repo metadata shape in the Node helper service
+- `GET /health` - basic health check
 
 Example request:
 
 ```bash
-curl http://localhost:4000/api/repo/vercel/next.js
+curl -X POST http://localhost:8000/api/search ^
+	-H "Content-Type: application/json" ^
+	-d "{\"query\":\"python csv parser\"}"
 ```
 
-Search API (backend):
+## Development Notes
 
-- Check `backend/app/main.py` and `backend/app/search_pipeline.py` for available routes and query parameters. Typical endpoints may include `/search` with a `q` parameter.
+- The frontend expects the backend on `http://localhost:8000`.
+- Search results are rendered in the client and then refined with local sorting and filtering.
+- The repo metadata result cards expect extra GitHub fields such as stars, forks, language, topics, archived state, and owner information.
+- Supabase RPC changes should be tracked in `backend/supabase/migrations/` when the repository schema changes.
 
-## Development
-
-- Run linters and formatters as configured in the workspace.
-- Add tests under `backend/tests/` and `frontend/__tests__/` where applicable.
-- Recreate migrations under `supabase/migrations/` when altering schema.
-
-Testing (example):
+Suggested checks:
 
 ```bash
-# run Python tests
-pytest -q
+cd frontend
+npm run lint
 
-# run frontend tests
-cd frontend && npm test
+cd backend
+python -m compileall app
 ```
 
 ## Deployment
 
-- This repo uses container-friendly services. Build and push images for each service and deploy with your chosen orchestrator (Kubernetes, Docker Compose on server, or cloud services).
-- Ensure `GITHUB_TOKEN` is provisioned in the deployment environment to avoid GitHub rate limits.
+- Use Docker Compose for local stack validation.
+- For production, run the FastAPI app behind a process manager or container orchestrator and provide the required environment variables.
+- Ensure rate-limited or secret-backed integrations such as Groq, Serper, Supabase, and GitHub are injected at deploy time.
 
-## Observability & Monitoring
+## Future Enhancements
 
-- Add structured logs (see `backend/app/logger.py`) and propagate tracing/context where helpful.
-- Export metrics for request rates, cache hits/misses, and ingestion status.
+Near-term:
 
-## Future Enhancements (Roadmap)
+- Unify repo metadata fetching so the backend and the Node helper service share one source of truth.
+- Add retries, timeouts, and cache headers around GitHub and web search calls.
+- Make repo-api and backend repo routes return a consistent response schema.
+- Add automated tests for query routing, clarification handling, and vector search normalization.
 
-Short-term:
+Mid-term:
 
-- Improve search ranking by integrating a vector database for semantic search.
-- Add pagination and rate-limited endpoints for large contributor/language lists.
-- Harden GitHub API error handling and exponential backoff for retries.
-- Add unit and integration tests for the `repo-api` endpoints.
+- Add authentication and saved search history.
+- Add incremental ingestion and scheduled refresh for indexed repositories.
+- Expand repo enrichment with license detection, dependency signals, and topic summaries.
+- Add pagination and faceted filtering for very large result sets.
+- Improve semantic retrieval with richer embeddings or hybrid lexical + vector ranking.
 
-Medium-term:
+Long-term:
 
-- Add user authentication and preferences for saved searches.
-- Implement incremental ingestion and webhook-driven updates from GitHub.
-- Add more detailed repository enrichment (license detection, dependency graphs).
-- Integrate a hosted vector DB (e.g., Milvus, Pinecone, Weaviate) for semantic similarity and contextual search.
-
-Long-term / aspirational:
-
-- Multi-source ingestion (GitLab, Bitbucket, private Git hosts).
-- Real-time collaboration features in the frontend (annotations, shared queries).
-- Built-in code intelligence (cross-repo symbol lookup, precise definitions).
-- Advanced analytics/insights dashboard with usage, errors, and query analytics.
+- Support multi-source ingestion from GitHub, GitLab, Bitbucket, and self-hosted Git providers.
+- Add collaborative features such as shared searches, annotations, and bookmarks.
+- Add analytics for query quality, routing accuracy, and result click-through.
+- Add a dedicated admin dashboard for ingestion health, cache state, and search performance.
 
 ## Contributing
 
-- Fork the repo, create a feature branch, and open a pull request against `main`.
-- Follow the code style and add tests for new features.
-- Open issues for bugs or suggestion; label with `enhancement` for roadmap items.
+- Fork the repository and create a feature branch.
+- Keep changes focused and add tests when behavior changes.
+- Open a pull request against `main`.
 
-## License & Contact
+## License
 
-- License: Add your chosen license file (e.g., `LICENSE`) to the repository.
-- Maintainer: Open issues or reach out via the repository's GitHub page.
-
----
-
-If you'd like, I can also:
-
-- Add a `CONTRIBUTING.md` and `CODE_OF_CONDUCT.md`.
-- Scaffold CI (GitHub Actions) for tests and linting.
-- Add a minimal README badge set (build, coverage).
-
-Created README for the project. See [README.md](README.md) for the full content.
+No license file is currently present in the repository. Add one before publishing or distributing the project externally.
