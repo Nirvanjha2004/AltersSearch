@@ -157,8 +157,8 @@ Rebuild the AltersSearch frontend using Aceternity UI primitives, updated design
     - Apply a glowing purple border container: `border border-[var(--accent)] rounded-xl focus-within:ring-2 focus-within:ring-[var(--accent)]`
     - _Requirements: 7.5, 8.1_
 
-- [ ] 8. Create SuggestionChips component (`components/SuggestionChips.tsx`)
-  - [ ] 8.1 Implement SuggestionChips with three preset chips
+- [x] 8. Create SuggestionChips component (`components/SuggestionChips.tsx`)
+  - [x] 8.1 Implement SuggestionChips with three preset chips
     - Accept `onSelect: (chip: string) => void` prop
     - Render three pill buttons: "python csv parser", "alternatives to Redis", "react drag and drop"
     - Style each as `bg-[var(--card-bg)] border border-[var(--border)] rounded-full px-4 py-1.5 text-sm text-[var(--text-muted)]`
