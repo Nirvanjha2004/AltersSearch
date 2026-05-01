@@ -8,14 +8,10 @@ import {
   Mic,
   ChevronDown,
   Sparkles,
-  Code2,
-  PenLine,
-  BookOpen,
-  Smile,
-  Zap,
 } from "lucide-react";
 import Sidebar, { type ChatItem } from "../components/Sidebar";
 import { ResultsGrid } from "../components/ResultsGrid";
+import SearchChips from "../components/SearchChips";
 import ProtectedRoute from "../components/ProtectedRoute";
 import { useAuth } from "../contexts/AuthContext";
 import type { AgentResponse, SearchResult } from "../types";
@@ -23,14 +19,6 @@ import type { AgentResponse, SearchResult } from "../types";
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
 // ─────────────────────────────────────────────────────────────────────────────
-
-const ACTION_PILLS = [
-  { id: "code",  label: "Code",       icon: <Code2 size={13} /> },
-  { id: "write", label: "Write",      icon: <PenLine size={13} /> },
-  { id: "learn", label: "Learn",      icon: <BookOpen size={13} /> },
-  { id: "life",  label: "Life stuff", icon: <Smile size={13} /> },
-  { id: "ai",    label: "AI tools",   icon: <Zap size={13} /> },
-] as const;
 
 const SIDEBAR_EXPANDED  = 240;
 const SIDEBAR_COLLAPSED = 64;
@@ -299,22 +287,14 @@ export default function SearchPage() {
                     </div>
                   </div>
 
-                  {/* Action pills */}
-                  <div className="action-pills">
-                    {ACTION_PILLS.map((pill) => (
-                      <motion.button
-                        key={pill.id}
-                        type="button"
-                        onClick={() => { setInputValue(pill.label); textareaRef.current?.focus(); }}
-                        whileHover={{ scale: 1.03 }}
-                        whileTap={{ scale: 0.97 }}
-                        className="action-pill"
-                      >
-                        {pill.icon}
-                        {pill.label}
-                      </motion.button>
-                    ))}
-                  </div>
+                  {/* Smart search chips */}
+                  <SearchChips
+                    onSelect={(query) => {
+                      setInputValue(query);
+                      textareaRef.current?.focus();
+                      void handleSearch(query);
+                    }}
+                  />
                 </motion.div>
 
                 {/* Skeleton while loading */}
