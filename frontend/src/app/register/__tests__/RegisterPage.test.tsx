@@ -31,7 +31,7 @@ vi.mock("@/lib/authApi", () => ({
   register: vi.fn(),
 }));
 
-import * as authApi from "@/lib/authApi";
+import * as authApi from "../../../lib/authApi";
 
 // ---------------------------------------------------------------------------
 // Mock AuthContext

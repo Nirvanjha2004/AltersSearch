@@ -1,5 +1,5 @@
 import "./globals.css";
-import { Inter, JetBrains_Mono } from "next/font/google";
+import { Inter, Space_Mono } from "next/font/google";
 import Providers from "../components/Providers";
 
 const inter = Inter({
@@ -8,8 +8,9 @@ const inter = Inter({
   display: "swap",
 });
 
-const jetbrainsMono = JetBrains_Mono({
+const spaceMono = Space_Mono({
   subsets: ["latin"],
+  weight: ["400", "700"],
   variable: "--font-mono",
   display: "swap",
 });
@@ -26,7 +27,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" data-theme="dark">
-      <body className={`${inter.variable} ${jetbrainsMono.variable}`}>
+      <body className={`${inter.variable} ${spaceMono.variable}`}>
         <Providers>{children}</Providers>
       </body>
     </html>

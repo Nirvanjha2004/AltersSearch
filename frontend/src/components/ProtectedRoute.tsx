@@ -22,11 +22,11 @@ export default function ProtectedRoute({
   const router = useRouter();
   const pathname = usePathname();
 
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      router.replace(`/login?redirect=${encodeURIComponent(pathname)}`);
-    }
-  }, [isLoading, isAuthenticated, router, pathname]);
+  // useEffect(() => {
+  //   if (!isLoading && !isAuthenticated) {
+  //     router.replace(`/login?redirect=${encodeURIComponent(pathname)}`);
+  //   }
+  // }, [isLoading, isAuthenticated, router, pathname]);
 
   // Show a spinner while the AuthContext is restoring the session.
   if (isLoading) {
@@ -63,9 +63,9 @@ export default function ProtectedRoute({
 
   // While the redirect is in flight (unauthenticated), render nothing to
   // avoid briefly flashing the protected content.
-  if (!isAuthenticated) {
-    return <></>;
-  }
+  // if (!isAuthenticated) {
+  //   return <></>;
+  // }
 
   return <>{children}</>;
 }

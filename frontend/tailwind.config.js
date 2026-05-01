@@ -6,7 +6,17 @@ module.exports = {
     "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
   ],
   theme: {
-    extend: {},
+    extend: {
+      colors: {
+        'bg-base':      'var(--bg-base)',
+        'card-bg':      'var(--card-bg)',
+        'accent':       'var(--accent)',
+        'glow-accent':  'var(--glow-accent)',
+        'text-primary': 'var(--text-primary)',
+        'text-muted':   'var(--text-muted)',
+        'border-token': 'var(--border)',
+      },
+    },
   },
   plugins: [require("tailwindcss-animate")],
 };
