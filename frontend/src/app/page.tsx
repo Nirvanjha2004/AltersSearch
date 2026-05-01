@@ -235,7 +235,7 @@ export default function HomePage() {
               {viewState === "search" ? (
                 <motion.div key="search" className="landing-wrap gap-8" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                   <EmptyState onSuggestionClick={handleSuggestion} />
-                  <SearchBar onSubmit={handleInitialSearch} isLoading={isLoading} routeMode={routeMode} autoFocus />
+                  <SearchBar onSubmit={handleInitialSearch} isLoading={isLoading} />
                   {isLoading ? (
                     <div className="skeleton-stack">
                       {[0, 1, 2].map((index) => (
@@ -252,9 +252,7 @@ export default function HomePage() {
                   <SearchBar
                     onSubmit={handleClarificationSearch}
                     isLoading={isLoading}
-                    routeMode="clarify"
                     initialValue={clarificationPrefill}
-                    autoFocus
                   />
                   {isLoading ? (
                     <div className="skeleton-stack">
@@ -274,7 +272,7 @@ export default function HomePage() {
                       Explore high-signal repositories with refined ranking and filters.
                     </p>
                   </div>
-                  <SearchBar onSubmit={handleInitialSearch} isLoading={isLoading} routeMode={routeMode} />
+                  <SearchBar onSubmit={handleInitialSearch} isLoading={isLoading} />
 
                   {isLoading ? (
                     <div className="skeleton-stack">

@@ -149,8 +149,8 @@ Rebuild the AltersSearch frontend using Aceternity UI primitives, updated design
     - Render a backdrop overlay when open that calls `onClose` on click
     - _Requirements: 6.7, 12.1_
 
-- [ ] 7. Rebuild SearchBar (`components/SearchBar.tsx`)
-  - [ ] 7.1 Implement SearchBar wrapping PlaceholderAndVanishInput
+- [x] 7. Rebuild SearchBar (`components/SearchBar.tsx`)
+  - [x] 7.1 Implement SearchBar wrapping PlaceholderAndVanishInput
     - Accept `onSubmit: (query: string) => void`, `isLoading: boolean`, and optional `initialValue` props
     - Wrap `<PlaceholderAndVanishInput />` with the placeholder array: `["python csv parser", "alternatives to Redis", "react drag and drop", "fast HTTP server in Go", "ML model serving framework"]`
     - Pass `onSubmit` and `isLoading` through to the inner component
