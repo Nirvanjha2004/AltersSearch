@@ -86,8 +86,8 @@ export default function SearchPage() {
   };
 
   // ── Search ─────────────────────────────────────────────────────────────
-  // Core search — does NOT touch the chat list (used for re-runs)
-  const runSearch = useCallback(async (query: string) => {
+  // Core search — adds to chat list ONLY on success
+  const runSearch = useCallback(async (query: string, chatId?: string) => {
     setError(null);
     setClarification(null);
     setIsLoading(true);
@@ -106,6 +106,7 @@ export default function SearchPage() {
       const data = (await res.json()) as AgentResponse;
 
       if (data.status === "clarification_needed") {
+        // Don't add to chat list — still waiting for a real result
         setClarification(data.clarification_question ?? data.message ?? null);
         setResults([]);
         setViewState("empty");
@@ -116,6 +117,13 @@ export default function SearchPage() {
         setResults([]);
         setViewState("empty");
         return;
+      }
+
+      // Success — now add/confirm the chat entry
+      if (chatId) {
+        // New search: add the entry now that we have results
+        setChats((prev) => [{ id: chatId, title: query }, ...prev].slice(0, 20));
+        setActiveChatId(chatId);
       }
 
       setResults(data.results ?? []);
@@ -133,16 +141,12 @@ export default function SearchPage() {
     }
   }, []);
 
-  // New search from input — adds a new chat entry
+  // New search from input — generates a chat ID and passes it to runSearch
   const handleSearch = useCallback(async (q: string) => {
     const query = q.trim();
     if (!query) return;
-
     const chatId = `chat-${Date.now()}`;
-    setChats((prev) => [{ id: chatId, title: query }, ...prev].slice(0, 20));
-    setActiveChatId(chatId);
-
-    await runSearch(query);
+    await runSearch(query, chatId);
   }, [runSearch]);
 
   const handleSubmit = () => {
