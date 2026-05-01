@@ -84,7 +84,7 @@ Rebuild the AltersSearch frontend using Aceternity UI primitives, updated design
     - Mount `<Spotlight className="top-0 left-0" fill="purple" />` at the top-left of the viewport
     - _Requirements: 2.1, 2.2_
 
-  - [ ] 4.2 Implement the centered auth card with branding
+  - [-] 4.2 Implement the centered auth card with branding
     - Render a card with `max-w-[400px]`, `bg-[var(--card-bg)]`, `border border-[var(--border)]`, `rounded-xl`, `p-8`
     - Render "AltersSearch" logo text in bold `--text-primary` and a BETA_Badge pill with `--glow-accent` border
     - Render `<h1>Sign in to your account</h1>` and subtext with a `<Link href="/register">Create one</Link>` styled in `--accent`
