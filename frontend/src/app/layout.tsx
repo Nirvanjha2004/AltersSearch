@@ -1,5 +1,5 @@
 import "./globals.css";
-import { Inter, Space_Mono } from "next/font/google";
+import { Inter, JetBrains_Mono } from "next/font/google";
 import Providers from "../components/Providers";
 
 const inter = Inter({
@@ -8,28 +8,27 @@ const inter = Inter({
   display: "swap",
 });
 
-const spaceMono = Space_Mono({
+const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
-  weight: ["400", "700"],
   variable: "--font-mono",
   display: "swap",
 });
 
 export const metadata = {
   title: "AltersSearch",
-  description: "Find the right repo. Instantly.",
+  description: "Find the right repository. Instantly.",
 };
 
 export default function RootLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: React.ReactNode;
 }) {
   return (
-    <html lang="en" data-theme="dark">
-      <body className={`${inter.variable} ${spaceMono.variable}`}>
+    <html lang="en">
+      <body className={`${inter.variable} ${jetbrainsMono.variable}`}>
         <Providers>{children}</Providers>
       </body>
     </html>
-  )
+  );
 }

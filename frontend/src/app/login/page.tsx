@@ -3,9 +3,8 @@
 import { useState, FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Loader2 } from "lucide-react";
-import { Spotlight } from "../../components/ui/spotlight";
-import { ShimmerButton } from "../../components/ui/shimmer-button";
+import { motion } from "framer-motion";
+import { Loader2, ArrowRight } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 
 export default function LoginPage() {
@@ -22,7 +21,6 @@ export default function LoginPage() {
     e.preventDefault();
     setError(null);
 
-    // Client-side validation — Requirements 3.5, 6.5
     if (!email.trim() || !password.trim()) {
       setError("Email and password are required.");
       return;
@@ -31,11 +29,9 @@ export default function LoginPage() {
     setIsSubmitting(true);
     try {
       await login(email.trim(), password);
-      // On success, redirect to the `redirect` query param or home — Requirements 4.3, 6.2
       const redirectTo = searchParams.get("redirect") ?? "/";
       router.replace(redirectTo);
     } catch {
-      // Show inline error for 401 / any auth failure — Requirements 3.6, 6.3
       setError("Invalid email or password.");
     } finally {
       setIsSubmitting(false);
@@ -43,72 +39,58 @@ export default function LoginPage() {
   };
 
   return (
-    /* Task 4.1: Full-viewport layout with dark background and Spotlight */
-    <div
-      className="relative flex min-h-screen w-full items-center justify-center overflow-hidden"
-      style={{ background: "#08080f" }}
-    >
-      {/* Purple radial glow behind the card */}
+    <div className="auth-shell">
+      {/* Background glow */}
       <div
-        className="pointer-events-none absolute inset-0 z-0"
-        style={{
-          background:
-            "radial-gradient(ellipse 60% 40% at 50% 50%, rgba(124,58,237,0.18) 0%, transparent 70%)",
-        }}
+        className="auth-bg-glow"
+        style={{ top: "-100px", right: "-100px" }}
+        aria-hidden="true"
+      />
+      <div
+        className="auth-bg-glow"
+        style={{ bottom: "-150px", left: "-150px", opacity: 0.5 }}
+        aria-hidden="true"
       />
 
-      {/* Spotlight — Task 4.1 */}
-      <Spotlight className="top-0 left-0" fill="purple" />
-
-      {/* Task 4.2: Centered auth card with branding */}
-      <div className="relative z-10 w-full max-w-[400px] rounded-xl border border-[var(--border)] bg-[var(--card-bg)] p-8">
-        {/* Brand row */}
-        <div className="mb-6 flex items-center gap-2">
-          <span className="text-sm font-bold text-[var(--text-primary)]">
-            AltersSearch
-          </span>
-          {/* BETA_Badge pill — border derived from --glow-accent */}
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+        className="auth-card"
+      >
+        {/* Logo */}
+        <div className="auth-logo">
+          <div className="auth-logo-mark" aria-hidden="true">A</div>
+          <span className="auth-logo-text">AltersSearch</span>
           <span
-            className="rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--glow-accent)]"
-            style={{ border: "1px solid var(--glow-accent)" }}
+            className="ml-1 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider"
+            style={{
+              background: "var(--accent-soft)",
+              border: "1px solid rgba(255,120,73,0.25)",
+              color: "var(--accent)",
+            }}
           >
             beta
           </span>
         </div>
 
-        {/* Heading — Task 4.2 */}
-        <h1 className="mb-1 text-xl font-semibold text-[var(--text-primary)]">
-          Sign in to your account
-        </h1>
-
-        {/* Subtext — Task 4.2 */}
-        <p className="mb-6 text-sm text-[var(--text-muted)]">
+        <h1 className="auth-title">Welcome back</h1>
+        <p className="auth-subtitle">
           Don&apos;t have an account?{" "}
-          <Link
-            href="/register"
-            className="text-[var(--accent)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
-          >
+          <Link href="/register" className="auth-link">
             Create one
           </Link>
         </p>
 
-        <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
-          {/* Inline error — Requirements 3.5, 3.6, 6.3 */}
-          {error ? (
-            <div
-              role="alert"
-              className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-400"
-            >
+        <form onSubmit={handleSubmit} noValidate className="auth-form">
+          {error && (
+            <div role="alert" className="auth-error">
               {error}
             </div>
-          ) : null}
+          )}
 
-          {/* Task 4.3: Email input with focus glow */}
-          <div className="flex flex-col gap-1.5">
-            <label
-              htmlFor="email"
-              className="text-sm font-medium text-[var(--text-primary)]"
-            >
+          <div className="auth-field">
+            <label htmlFor="email" className="auth-label">
               Email address
             </label>
             <input
@@ -119,16 +101,12 @@ export default function LoginPage() {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
               disabled={isSubmitting}
-              className="rounded-lg border border-[var(--border)] bg-[var(--bg-base)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] transition-colors focus:border-[var(--accent)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-50"
+              className="auth-input"
             />
           </div>
 
-          {/* Task 4.3: Password input with focus glow */}
-          <div className="flex flex-col gap-1.5">
-            <label
-              htmlFor="password"
-              className="text-sm font-medium text-[var(--text-primary)]"
-            >
+          <div className="auth-field">
+            <label htmlFor="password" className="auth-label">
               Password
             </label>
             <input
@@ -139,31 +117,32 @@ export default function LoginPage() {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
               disabled={isSubmitting}
-              className="rounded-lg border border-[var(--border)] bg-[var(--bg-base)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] transition-colors focus:border-[var(--accent)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-50"
+              className="auth-input"
             />
           </div>
 
-          {/* Task 4.5: ShimmerButton submit — full width, spinner while submitting */}
-          <ShimmerButton
+          <motion.button
             type="submit"
             disabled={isSubmitting}
-            aria-busy={isSubmitting ? "true" : "false"}
-            className="mt-2 w-full"
+            aria-busy={isSubmitting}
+            whileHover={{ scale: isSubmitting ? 1 : 1.01 }}
+            whileTap={{ scale: isSubmitting ? 1 : 0.98 }}
+            className="auth-submit-btn"
           >
             {isSubmitting ? (
               <>
-                <Loader2
-                  className="mr-2 h-4 w-4 animate-spin"
-                  aria-hidden="true"
-                />
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                 Signing in…
               </>
             ) : (
-              "Sign in"
+              <>
+                Sign in
+                <ArrowRight size={15} aria-hidden="true" />
+              </>
             )}
-          </ShimmerButton>
+          </motion.button>
         </form>
-      </div>
+      </motion.div>
     </div>
   );
 }

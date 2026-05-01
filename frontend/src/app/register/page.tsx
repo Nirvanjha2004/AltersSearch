@@ -3,6 +3,8 @@
 import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { motion } from "framer-motion";
+import { Loader2, ArrowRight } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import * as authApi from "../../lib/authApi";
 
@@ -20,12 +22,10 @@ export default function RegisterPage() {
     e.preventDefault();
     setError(null);
 
-    // Client-side validation — Requirements 7.2, 7.5
     if (password !== confirmPassword) {
       setError("Passwords do not match.");
       return;
     }
-
     if (password.length < 8) {
       setError("Password must be at least 8 characters.");
       return;
@@ -33,15 +33,11 @@ export default function RegisterPage() {
 
     setIsSubmitting(true);
     try {
-      // Register the account — Requirement 7.1
       await authApi.register(email.trim(), password);
-
-      // Auto-login on 201 success — Requirement 7.3
       await login(email.trim(), password);
       router.replace("/");
     } catch (err: unknown) {
       if (err instanceof Error) {
-        // 409 duplicate email — Requirement 7.4
         if (err.message === "Email already registered.") {
           setError("An account with this email already exists.");
         } else {
@@ -56,14 +52,37 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="auth-page-shell">
-      <div className="auth-card">
-        {/* Brand */}
-        <div className="auth-brand">
-          <span className="text-sm font-semibold tracking-tight text-[var(--text-primary)]">
-            AltersSearch
-          </span>
-          <span className="rounded-full border border-[color:color-mix(in_srgb,var(--accent)_28%,transparent)] bg-[var(--accent-soft)] px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--accent)]">
+    <div className="auth-shell">
+      {/* Background glows */}
+      <div
+        className="auth-bg-glow"
+        style={{ top: "-100px", left: "-100px" }}
+        aria-hidden="true"
+      />
+      <div
+        className="auth-bg-glow"
+        style={{ bottom: "-150px", right: "-150px", opacity: 0.5 }}
+        aria-hidden="true"
+      />
+
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+        className="auth-card"
+      >
+        {/* Logo */}
+        <div className="auth-logo">
+          <div className="auth-logo-mark" aria-hidden="true">A</div>
+          <span className="auth-logo-text">AltersSearch</span>
+          <span
+            className="ml-1 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider"
+            style={{
+              background: "var(--accent-soft)",
+              border: "1px solid rgba(255,120,73,0.25)",
+              color: "var(--accent)",
+            }}
+          >
             beta
           </span>
         </div>
@@ -77,12 +96,11 @@ export default function RegisterPage() {
         </p>
 
         <form onSubmit={handleSubmit} noValidate className="auth-form">
-          {/* Inline error — Requirements 7.2, 7.4, 7.5 */}
-          {error ? (
+          {error && (
             <div role="alert" className="auth-error">
               {error}
             </div>
-          ) : null}
+          )}
 
           <div className="auth-field">
             <label htmlFor="email" className="auth-label">
@@ -94,9 +112,9 @@ export default function RegisterPage() {
               autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="auth-input"
               placeholder="you@example.com"
               disabled={isSubmitting}
+              className="auth-input"
             />
           </div>
 
@@ -110,9 +128,9 @@ export default function RegisterPage() {
               autoComplete="new-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="auth-input"
               placeholder="At least 8 characters"
               disabled={isSubmitting}
+              className="auth-input"
             />
           </div>
 
@@ -126,34 +144,34 @@ export default function RegisterPage() {
               autoComplete="new-password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              className="auth-input"
               placeholder="••••••••"
               disabled={isSubmitting}
+              className="auth-input"
             />
           </div>
 
-          {/* Submit — disabled + spinner while in flight */}
-          <button
+          <motion.button
             type="submit"
-            className="auth-submit-btn"
             disabled={isSubmitting}
             aria-busy={isSubmitting}
+            whileHover={{ scale: isSubmitting ? 1 : 1.01 }}
+            whileTap={{ scale: isSubmitting ? 1 : 0.98 }}
+            className="auth-submit-btn"
           >
             {isSubmitting ? (
               <>
-                <span
-                  className="spinner-sm"
-                  role="status"
-                  aria-label="Creating account…"
-                />
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                 Creating account…
               </>
             ) : (
-              "Create account"
+              <>
+                Create account
+                <ArrowRight size={15} aria-hidden="true" />
+              </>
             )}
-          </button>
+          </motion.button>
         </form>
-      </div>
+      </motion.div>
     </div>
   );
 }

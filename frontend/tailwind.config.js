@@ -7,23 +7,49 @@ module.exports = {
   ],
   theme: {
     extend: {
+      colors: {
+        bg:           "var(--bg)",
+        surface:      "var(--bg-surface)",
+        elevated:     "var(--bg-elevated)",
+        border:       "var(--border)",
+        accent:       "var(--accent)",
+        "accent-hover": "var(--accent-hover)",
+        "text-primary":   "var(--text-primary)",
+        "text-secondary": "var(--text-secondary)",
+        "text-muted":     "var(--text-muted)",
+      },
+      fontFamily: {
+        sans: ["var(--font-primary)", "Inter", "system-ui", "sans-serif"],
+        mono: ["var(--font-mono)", "JetBrains Mono", "monospace"],
+      },
+      borderRadius: {
+        sm: "var(--radius-sm)",
+        md: "var(--radius-md)",
+        lg: "var(--radius-lg)",
+        xl: "var(--radius-xl)",
+      },
       animation: {
-        spotlight: "spotlight 2s ease .75s 1 forwards",
+        "shimmer-slide": "shimmer-slide 2s infinite",
+        "fade-up":       "fade-up 0.25s ease forwards",
+        "sparkle":       "sparkle 2s ease-in-out infinite",
+        "pulse-glow":    "pulse-glow 2s ease-in-out infinite",
       },
       keyframes: {
-        spotlight: {
-          "0%": { opacity: "0", transform: "translate(-72%, -62%) scale(0.5)" },
-          "100%": { opacity: "1", transform: "translate(-50%, -40%) scale(1)" },
+        "shimmer-slide": {
+          "100%": { transform: "translateX(100%)" },
         },
-      },
-      colors: {
-        'bg-base':      'var(--bg-base)',
-        'card-bg':      'var(--card-bg)',
-        'accent':       'var(--accent)',
-        'glow-accent':  'var(--glow-accent)',
-        'text-primary': 'var(--text-primary)',
-        'text-muted':   'var(--text-muted)',
-        'border-token': 'var(--border)',
+        "fade-up": {
+          from: { opacity: "0", transform: "translateY(10px)" },
+          to:   { opacity: "1", transform: "translateY(0)" },
+        },
+        sparkle: {
+          "0%, 100%": { transform: "scale(1) rotate(0deg)", opacity: "0.8" },
+          "50%":       { transform: "scale(1.2) rotate(15deg)", opacity: "1" },
+        },
+        "pulse-glow": {
+          "0%, 100%": { opacity: "0.6" },
+          "50%":       { opacity: "1" },
+        },
       },
     },
   },
