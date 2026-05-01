@@ -1,13 +1,17 @@
 "use client";
 
-import { useState, FormEvent } from "react";
+import { Suspense, useState, FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { Loader2, ArrowRight } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 
-export default function LoginPage() {
+// ─────────────────────────────────────────────────────────────────────────────
+// Inner form — uses useSearchParams, must be inside <Suspense>
+// ─────────────────────────────────────────────────────────────────────────────
+
+function LoginForm() {
   const { login } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -39,16 +43,85 @@ export default function LoginPage() {
   };
 
   return (
+    <form onSubmit={handleSubmit} noValidate className="auth-form">
+      {error && (
+        <div role="alert" className="auth-error">
+          {error}
+        </div>
+      )}
+
+      <div className="auth-field">
+        <label htmlFor="email" className="auth-label">
+          Email address
+        </label>
+        <input
+          id="email"
+          type="email"
+          autoComplete="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="you@example.com"
+          disabled={isSubmitting}
+          className="auth-input"
+        />
+      </div>
+
+      <div className="auth-field">
+        <label htmlFor="password" className="auth-label">
+          Password
+        </label>
+        <input
+          id="password"
+          type="password"
+          autoComplete="current-password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="••••••••"
+          disabled={isSubmitting}
+          className="auth-input"
+        />
+      </div>
+
+      <motion.button
+        type="submit"
+        disabled={isSubmitting}
+        aria-busy={isSubmitting}
+        whileHover={{ scale: isSubmitting ? 1 : 1.01 }}
+        whileTap={{ scale: isSubmitting ? 1 : 0.98 }}
+        className="auth-submit-btn"
+      >
+        {isSubmitting ? (
+          <>
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+            Signing in…
+          </>
+        ) : (
+          <>
+            Sign in
+            <ArrowRight size={15} aria-hidden="true" />
+          </>
+        )}
+      </motion.button>
+    </form>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Page shell — wraps LoginForm in Suspense
+// ─────────────────────────────────────────────────────────────────────────────
+
+export default function LoginPage() {
+  return (
     <div className="auth-shell">
-      {/* Background glow */}
+      {/* Background glows */}
       <div
         className="auth-bg-glow"
-        style={{ top: "-100px", right: "-100px" }}
+        style={{ top: "-100px", right: "-100px" } as React.CSSProperties}
         aria-hidden="true"
       />
       <div
         className="auth-bg-glow"
-        style={{ bottom: "-150px", left: "-150px", opacity: 0.5 }}
+        style={{ bottom: "-150px", left: "-150px", opacity: 0.5 } as React.CSSProperties}
         aria-hidden="true"
       />
 
@@ -68,7 +141,7 @@ export default function LoginPage() {
               background: "var(--accent-soft)",
               border: "1px solid rgba(255,120,73,0.25)",
               color: "var(--accent)",
-            }}
+            } as React.CSSProperties}
           >
             beta
           </span>
@@ -82,66 +155,10 @@ export default function LoginPage() {
           </Link>
         </p>
 
-        <form onSubmit={handleSubmit} noValidate className="auth-form">
-          {error && (
-            <div role="alert" className="auth-error">
-              {error}
-            </div>
-          )}
-
-          <div className="auth-field">
-            <label htmlFor="email" className="auth-label">
-              Email address
-            </label>
-            <input
-              id="email"
-              type="email"
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              disabled={isSubmitting}
-              className="auth-input"
-            />
-          </div>
-
-          <div className="auth-field">
-            <label htmlFor="password" className="auth-label">
-              Password
-            </label>
-            <input
-              id="password"
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              disabled={isSubmitting}
-              className="auth-input"
-            />
-          </div>
-
-          <motion.button
-            type="submit"
-            disabled={isSubmitting}
-            aria-busy={isSubmitting}
-            whileHover={{ scale: isSubmitting ? 1 : 1.01 }}
-            whileTap={{ scale: isSubmitting ? 1 : 0.98 }}
-            className="auth-submit-btn"
-          >
-            {isSubmitting ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                Signing in…
-              </>
-            ) : (
-              <>
-                Sign in
-                <ArrowRight size={15} aria-hidden="true" />
-              </>
-            )}
-          </motion.button>
-        </form>
+        {/* Suspense boundary required by Next.js 14 for useSearchParams */}
+        <Suspense fallback={<div className="h-48" />}>
+          <LoginForm />
+        </Suspense>
       </motion.div>
     </div>
   );
