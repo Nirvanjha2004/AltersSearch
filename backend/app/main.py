@@ -19,7 +19,7 @@ GITHUB_API_BASE = "https://api.github.com"
 # Allow the local Next.js frontend during development.
 app.add_middleware(
 	CORSMiddleware,
-	allow_origins=["http://localhost:3000"],
+	allow_origins=["http://localhost:3000", "https://alters-search.vercel.app"],
 	allow_credentials=True,
 	allow_methods=["*"],
 	allow_headers=["*"],
