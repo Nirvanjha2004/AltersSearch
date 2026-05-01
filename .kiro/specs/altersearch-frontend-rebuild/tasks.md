@@ -171,7 +171,7 @@ Rebuild the AltersSearch frontend using Aceternity UI primitives, updated design
     - Style with `text-[var(--accent)] border border-[var(--accent)/30] bg-[var(--accent)/10] rounded-full px-3 py-1 text-xs font-medium`
     - _Requirements: 7.6_
 
-- [-] 10. Create RepoCard component (`components/RepoCard.tsx`)
+- [x] 10. Create RepoCard component (`components/RepoCard.tsx`)
   - [x] 10.1 Implement RepoCard layout and content
     - Accept `result: SearchResult` and `index: number` props
     - Render repo name in `font-bold text-[var(--text-primary)]`
@@ -185,13 +185,13 @@ Rebuild the AltersSearch frontend using Aceternity UI primitives, updated design
     - Add `whileHover={{ scale: 1.02, y: -4 }}` with `transition={{ type: "spring", stiffness: 300 }}`
     - _Requirements: 9.8, 10.2_
 
-  - [-] 10.3 Wrap RepoCard in HoverEffect or BackgroundGradient
+  - [x] 10.3 Wrap RepoCard in HoverEffect or BackgroundGradient
     - Wrap the inner card content in `<BackgroundGradient>` (or `<HoverEffect>`) from `components/ui/`
     - Add `role="button"`, `tabIndex={0}`, and `onKeyDown` handler for Enter/Space to open the GitHub URL
     - _Requirements: 9.7, 12.4_
 
-- [ ] 11. Create ResultsGrid component (`components/ResultsGrid.tsx`)
-  - [ ] 11.1 Implement ResultsGrid layout and states
+- [x] 11. Create ResultsGrid component (`components/ResultsGrid.tsx`)
+  - [x] 11.1 Implement ResultsGrid layout and states
     - Accept `results: SearchResult[]` and `isLoading: boolean` props
     - Apply `grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5`
     - When `isLoading` is true: render 6 `<SkeletonCard />` components in the grid
@@ -199,35 +199,35 @@ Rebuild the AltersSearch frontend using Aceternity UI primitives, updated design
     - When `results` has items: render a `<RepoCard result={r} index={i} />` for each entry
     - _Requirements: 10.1, 10.4_
 
-  - [ ] 11.2 Wire AnimatePresence for results entrance
+  - [x] 11.2 Wire AnimatePresence for results entrance
     - Wrap the results list in `<AnimatePresence>` so cards animate in when the results array changes
     - _Requirements: 10.2_
 
-- [ ] 12. Rebuild SkeletonCard (`components/SkeletonCard.tsx`)
-  - [ ] 12.1 Implement SkeletonCard matching RepoCard dimensions
+- [x] 12. Rebuild SkeletonCard (`components/SkeletonCard.tsx`)
+  - [x] 12.1 Implement SkeletonCard matching RepoCard dimensions
     - Render an `animate-pulse` placeholder with `bg-[var(--border)]` blocks matching the RepoCard height and layout
     - Include placeholder blocks for: repo name line, two description lines, topic chips row, and footer row
     - Apply `rounded-xl` border radius and `bg-[var(--card-bg)]` card background
     - _Requirements: 8.2_
 
-- [ ] 13. Rebuild Search page (`app/page.tsx`)
-  - [ ] 13.1 Implement three-zone layout with Topbar and Sidebar
+- [x] 13. Rebuild Search page (`app/page.tsx`)
+  - [x] 13.1 Implement three-zone layout with Topbar and Sidebar
     - Render `<Topbar onToggleSidebar={...} sidebarOpen={...} />` as the sticky top bar
     - Render `<Sidebar recentSearches={...} onSelectSearch={...} onNewSearch={...} isOpen={...} onClose={...} />` as the fixed left panel
     - Render a `<main>` element with `flex-1` taking the remaining space
     - Declare all required state: `query`, `results`, `recentSearches`, `isLoading`, `error`, `viewState`, `sidebarOpen`, `clarification`
     - _Requirements: 5.1–5.6, 6.1–6.7, 13.1_
 
-  - [ ] 13.2 Implement empty state hero section
+  - [x] 13.2 Implement empty state hero section
     - When `viewState === "empty"`: render centered `<h1>AltersSearch</h1>`, tagline "Find the right repo. Instantly." in `--text-muted`, `<SuggestionChips onSelect={handleChipSelect} />`, `<SearchBar />`, and `<VectorSearchToggle />`
     - `handleChipSelect` should populate the query and immediately call `handleSearch`
     - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5, 7.6_
 
-  - [ ] 13.3 Implement search submission and API call
+  - [x] 13.3 Implement search submission and API call
     - `handleSearch(query)` should: push query to `recentSearches` (deduplicated, max 12, most-recent-first), set `viewState("loading")`, POST to `http://localhost:8000/api/search` with `{ query }`, then on `clarification_needed` set `clarification`, on `success` set `results` and `viewState("results")`, on error set `error` and `viewState("empty")`
     - _Requirements: 8.1, 8.3, 8.4, 8.5_
 
-  - [ ] 13.4 Implement results view and AnimatePresence transitions
+  - [x] 13.4 Implement results view and AnimatePresence transitions
     - When `viewState === "results"`: render `<ResultsGrid results={results} isLoading={false} />`
     - When `viewState === "loading"`: render `<ResultsGrid results={[]} isLoading={true} />`
     - Wrap both views in `<AnimatePresence mode="wait">` with `<motion.div>` fade transitions (key="empty" / key="results")

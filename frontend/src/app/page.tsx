@@ -1,343 +1,270 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { useEffect } from "react";
+import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import AnswerCard from "../components/AnswerCard";
-import ClarificationCard from "../components/ClarificationCard";
-import EmptyState from "../components/EmptyState";
-import EnrichmentPill from "../components/EnrichmentPill";
-import FiltersPanel from "../components/FiltersPanel";
-import ResultCard from "../components/ResultCard";
-import SearchBar from "../components/SearchBar";
-import Sidebar from "../components/Sidebar";
-import SkeletonCard from "../components/SkeletonCard";
 import Topbar from "../components/Topbar";
+import Sidebar from "../components/Sidebar";
+import SearchBar from "../components/SearchBar";
+import SuggestionChips from "../components/SuggestionChips";
+import { VectorSearchToggle } from "../components/VectorSearchToggle";
+import { ResultsGrid } from "../components/ResultsGrid";
 import ProtectedRoute from "../components/ProtectedRoute";
-import type { AgentResponse, SearchRequest, SearchResult } from "../types";
+import type { AgentResponse, SearchResult } from "../types";
 
-type ViewState = "search" | "clarification" | "results";
-type RouteMode = "vector_search" | "web_search" | "clarify";
+// ---------------------------------------------------------------------------
+// SearchPage
+// ---------------------------------------------------------------------------
 
-export default function HomePage() {
-  const [theme, setTheme] = useState<"light" | "dark">("dark");
-  const [viewState, setViewState] = useState<ViewState>("search");
-  const [isLoading, setIsLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [mobileNavOpen, setMobileNavOpen] = useState(false);
-
-  const [originalQuery, setOriginalQuery] = useState("");
-  const [clarificationQuestion, setClarificationQuestion] = useState("");
-  const [clarificationPrefill, setClarificationPrefill] = useState("");
+export default function SearchPage() {
+  // ── State ────────────────────────────────────────────────────────────────
+  const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
-  const [answer, setAnswer] = useState<string | null>(null);
-  const [routeMode, setRouteMode] = useState<RouteMode>("vector_search");
-  const [enrichedQuery, setEnrichedQuery] = useState("");
-  const [sortBy, setSortBy] = useState<"stars" | "forks" | "pushed" | "created">("stars");
-  const [filterDomain, setFilterDomain] = useState("all");
-  const [filterLanguage, setFilterLanguage] = useState("all");
-  const [filterArchived, setFilterArchived] = useState<"all" | "yes" | "no">("all");
-  const [filterFork, setFilterFork] = useState<"all" | "yes" | "no">("all");
-  const [clientSearch, setClientSearch] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [viewState, setViewState] = useState<"empty" | "loading" | "results">("empty");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [clarification, setClarification] = useState<string | null>(null);
 
-  const title = useMemo(() => {
-    if (viewState === "clarification") {
-      return "Need one more detail";
-    }
-    if (viewState === "results") {
-      return "Search results";
-    }
-    return "Open Source Search";
-  }, [viewState]);
+  // ── Helpers ──────────────────────────────────────────────────────────────
 
-  const pushRecentSearch = (query: string) => {
-    setRecentSearches((previous) => [query, ...previous.filter((item) => item !== query)].slice(0, 12));
+  /** Push a query to the recent-searches list (deduplicated, max 12, most-recent-first). */
+  const pushRecentSearch = (q: string) => {
+    setRecentSearches((prev) =>
+      [q, ...prev.filter((item) => item !== q)].slice(0, 12)
+    );
   };
 
-  const callSearchApi = async (payload: SearchRequest): Promise<AgentResponse> => {
-    const response = await fetch("http://localhost:8000/api/search", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+  // ── Search handler ───────────────────────────────────────────────────────
 
-    if (!response.ok) {
-      throw new Error(`Search API failed with status ${response.status}`);
-    }
+  const handleSearch = async (q: string) => {
+    if (!q.trim()) return;
 
-    return (await response.json()) as AgentResponse;
-  };
+    // Update query state and recent searches
+    setQuery(q);
+    pushRecentSearch(q);
 
-  const applyResponse = (data: AgentResponse, fallbackQuery: string) => {
-    setRouteMode((data.action as RouteMode) || "vector_search");
-    setEnrichedQuery(data.enriched_query || "");
-    setAnswer(data.answer || null);
-
-    if (data.status === "clarification_needed") {
-      const question = data.message || "Could you be more specific?";
-      const prefill = `Original intent: ${fallbackQuery}. Clarification: `;
-      setClarificationQuestion(question);
-      setClarificationPrefill(prefill);
-      setViewState("clarification");
-      setResults([]);
-      return;
-    }
-
-    if (data.status === "error") {
-      setErrorMessage(data.message || "Search failed. Please try again.");
-      setResults([]);
-      setViewState("results");
-      return;
-    }
-
-    setResults(data.results ?? []);
-    setViewState("results");
-  };
-
-  const runSearch = async (query: string, options?: { preserveOriginal?: boolean }) => {
+    // Transition to loading view
+    setError(null);
+    setClarification(null);
     setIsLoading(true);
-    setErrorMessage(null);
-    setMobileNavOpen(false);
-
-    if (!options?.preserveOriginal) {
-      setOriginalQuery(query);
-    }
-    pushRecentSearch(query);
+    setViewState("loading");
 
     try {
-      const data = await callSearchApi({ query });
-      applyResponse(data, options?.preserveOriginal ? originalQuery : query);
-    } catch {
-      setErrorMessage("Could not reach the backend. Ensure FastAPI is running on port 8000.");
+      const response = await fetch("http://localhost:8000/api/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: q }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Search API responded with status ${response.status}`);
+      }
+
+      const data = (await response.json()) as AgentResponse;
+
+      if (data.status === "clarification_needed") {
+        setClarification(data.clarification_question ?? data.message ?? null);
+        setResults([]);
+        setViewState("empty");
+        return;
+      }
+
+      if (data.status === "error") {
+        setError(data.message || "Search failed. Please try again.");
+        setResults([]);
+        setViewState("empty");
+        return;
+      }
+
+      // success
+      setResults(data.results ?? []);
+      setViewState("results");
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Could not reach the backend. Ensure FastAPI is running on port 8000.";
+      setError(message);
+      setResults([]);
+      setViewState("empty");
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleInitialSearch = async (query: string) => {
-    await runSearch(query);
+  /** Called when a suggestion chip is clicked — populate query and search immediately. */
+  const handleChipSelect = (chip: string) => {
+    setQuery(chip);
+    void handleSearch(chip);
   };
 
-  const handleClarificationSearch = async (query: string) => {
-    await runSearch(query, { preserveOriginal: true });
-  };
-
-  const handleSuggestion = async (suggestion: string) => {
-    await handleInitialSearch(suggestion);
-  };
-
-  const resetSearch = () => {
-    setViewState("search");
+  /** Called from Sidebar "New Search" button — reset to empty state. */
+  const handleNewSearch = () => {
+    setViewState("empty");
     setResults([]);
-    setErrorMessage(null);
-    setAnswer(null);
-    setEnrichedQuery("");
-    setRouteMode("vector_search");
+    setError(null);
+    setClarification(null);
+    setQuery("");
   };
 
-  const sourceForAnswer = results.find((item) => item.url)?.url;
+  /** Called from Sidebar recent-search item — re-run that query. */
+  const handleSelectSearch = (q: string) => {
+    setSidebarOpen(false);
+    void handleSearch(q);
+  };
 
-  const uniqueDomains = useMemo(() => {
-    const values = new Set(results.map((result) => result.domain).filter(Boolean));
-    return ["all", ...Array.from(values).sort((a, b) => a.localeCompare(b))];
-  }, [results]);
-
-  const uniqueLanguages = useMemo(() => {
-    const values = new Set(results.map((result) => result.language).filter(Boolean) as string[]);
-    return ["all", ...Array.from(values).sort((a, b) => a.localeCompare(b))];
-  }, [results]);
-
-  const filteredResults = useMemo(() => {
-    const query = clientSearch.trim().toLowerCase();
-
-    const list = results.filter((repo) => {
-      if (filterDomain !== "all" && repo.domain !== filterDomain) return false;
-      if (filterLanguage !== "all" && (repo.language || "Unknown") !== filterLanguage) return false;
-
-      if (filterArchived === "yes" && !repo.is_archived) return false;
-      if (filterArchived === "no" && repo.is_archived) return false;
-
-      if (filterFork === "yes" && !repo.is_fork) return false;
-      if (filterFork === "no" && repo.is_fork) return false;
-
-      if (!query) return true;
-
-      const text = `${repo.repo_name || ""} ${repo.full_name || ""} ${repo.description || ""}`.toLowerCase();
-      return query
-        .split(/\s+/)
-        .filter(Boolean)
-        .every((term) => text.includes(term));
-    });
-
-    const getDate = (value?: string) => {
-      if (!value) return 0;
-      const parsed = new Date(value).getTime();
-      return Number.isNaN(parsed) ? 0 : parsed;
-    };
-
-    return [...list].sort((a, b) => {
-      if (sortBy === "stars") return (b.stargazers_count || 0) - (a.stargazers_count || 0);
-      if (sortBy === "forks") return (b.forks_count || 0) - (a.forks_count || 0);
-      if (sortBy === "pushed") return getDate(b.github_pushed_at) - getDate(a.github_pushed_at);
-      return getDate(b.github_created_at) - getDate(a.github_created_at);
-    });
-  }, [results, clientSearch, filterDomain, filterLanguage, filterArchived, filterFork, sortBy]);
-
-  useEffect(() => {
-    const stored = window.localStorage.getItem("alterssearch-theme");
-    if (stored === "light" || stored === "dark") {
-      setTheme(stored);
-      return;
-    }
-
-    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    setTheme(prefersDark ? "dark" : "light");
-  }, []);
-
-  useEffect(() => {
-    document.documentElement.setAttribute("data-theme", theme);
-    window.localStorage.setItem("alterssearch-theme", theme);
-  }, [theme]);
+  // ── Render ───────────────────────────────────────────────────────────────
 
   return (
     <ProtectedRoute>
-    <div className="app-shell relative overflow-hidden">
-      <div className="pointer-events-none absolute inset-0 opacity-[0.35] [background-image:radial-gradient(var(--grid-dot)_0.5px,transparent_0.5px)] [background-size:3px_3px]" />
-      <Topbar
-        onToggleSidebar={() => setMobileNavOpen((value) => !value)}
-        sidebarOpen={mobileNavOpen}
-      />
-      <div className="content-shell mx-auto w-full max-w-[1920px] gap-5 px-0">
-        <Sidebar
-          recentSearches={recentSearches}
-          onSelectSearch={handleInitialSearch}
-          onNewSearch={resetSearch}
-          isOpen={mobileNavOpen}
-          onClose={() => setMobileNavOpen(false)}
+      <div className="relative min-h-screen overflow-hidden" style={{ background: "var(--bg-base)" }}>
+        {/* Subtle dot-grid background */}
+        <div
+          className="pointer-events-none absolute inset-0 opacity-[0.35]"
+          style={{
+            backgroundImage: "radial-gradient(var(--border) 0.5px, transparent 0.5px)",
+            backgroundSize: "3px 3px",
+          }}
+          aria-hidden="true"
         />
 
-        <main className="main-area min-w-0">
-          <div
-            className={`main-inner px-6 py-10 md:px-8 ${
-              viewState === "results"
-                ? "mx-0 w-full max-w-none px-0 md:px-0"
-                : "mx-auto max-w-[780px]"
-            }`}
-          >
-            {errorMessage ? (
-              <motion.div className="error-banner" initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}>
-                {errorMessage}
-              </motion.div>
-            ) : null}
+        {/* ── Topbar ─────────────────────────────────────────────────────── */}
+        <Topbar
+          onToggleSidebar={() => setSidebarOpen((prev) => !prev)}
+          sidebarOpen={sidebarOpen}
+        />
 
+        {/* ── Content shell: Sidebar + Main ──────────────────────────────── */}
+        <div className="flex" style={{ minHeight: "calc(100vh - 56px)" }}>
+          {/* Sidebar */}
+          <Sidebar
+            recentSearches={recentSearches}
+            onSelectSearch={handleSelectSearch}
+            onNewSearch={handleNewSearch}
+            isOpen={sidebarOpen}
+            onClose={() => setSidebarOpen(false)}
+          />
+
+          {/* Main content area */}
+          <main className="flex-1 min-w-0 overflow-y-auto" style={{ maxHeight: "calc(100vh - 56px)" }}>
+            {/* Error banner */}
+            {error && (
+              <div
+                role="alert"
+                className="mx-6 mt-6 rounded-lg border px-4 py-3 text-sm"
+                style={{
+                  borderColor: "color-mix(in srgb, var(--error, #ef4444) 45%, var(--border))",
+                  background: "color-mix(in srgb, var(--error, #ef4444) 12%, transparent)",
+                  color: "color-mix(in srgb, var(--error, #ef4444) 70%, var(--text-primary))",
+                }}
+              >
+                {error}
+              </div>
+            )}
+
+            {/* Clarification banner */}
+            {clarification && (
+              <div
+                className="mx-6 mt-6 rounded-lg border px-4 py-3 text-sm"
+                style={{
+                  borderColor: "color-mix(in srgb, var(--accent) 40%, var(--border))",
+                  background: "color-mix(in srgb, var(--accent) 10%, transparent)",
+                  color: "var(--text-primary)",
+                }}
+              >
+                <span className="font-medium text-[var(--accent)]">Clarification needed: </span>
+                {clarification}
+              </div>
+            )}
+
+            {/* ── Animated view transitions ─────────────────────────────── */}
             <AnimatePresence mode="wait">
-              {viewState === "search" ? (
-                <motion.div key="search" className="landing-wrap gap-8" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                  <EmptyState onSuggestionClick={handleSuggestion} />
-                  <SearchBar onSubmit={handleInitialSearch} isLoading={isLoading} />
-                  {isLoading ? (
-                    <div className="skeleton-stack">
-                      {[0, 1, 2].map((index) => (
-                        <SkeletonCard key={index} index={index} />
-                      ))}
-                    </div>
-                  ) : null}
-                </motion.div>
-              ) : null}
-
-              {viewState === "clarification" ? (
-                <motion.section key="clarification" className="result-area" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
-                  <ClarificationCard question={clarificationQuestion} />
-                  <SearchBar
-                    onSubmit={handleClarificationSearch}
-                    isLoading={isLoading}
-                    initialValue={clarificationPrefill}
-                  />
-                  {isLoading ? (
-                    <div className="skeleton-stack">
-                      {[0, 1, 2].map((index) => (
-                        <SkeletonCard key={index} index={index} />
-                      ))}
-                    </div>
-                  ) : null}
-                </motion.section>
-              ) : null}
-
-              {viewState === "results" ? (
-                <motion.section key="results" className="result-area" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
-                  <div className="mb-1">
-                    <h1 className="m-0 text-[28px] font-semibold tracking-tight text-[var(--text-primary)]">{title}</h1>
-                    <p className="m-0 mt-2 text-sm text-[var(--text-secondary)]">
-                      Explore high-signal repositories with refined ranking and filters.
+              {/* ── Empty hero ───────────────────────────────────────────── */}
+              {viewState === "empty" && (
+                <motion.div
+                  key="empty"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="flex flex-col items-center justify-center gap-8 px-6 py-16"
+                  style={{ minHeight: "calc(100vh - 160px)" }}
+                >
+                  {/* Hero heading */}
+                  <div className="text-center space-y-3">
+                    <h1
+                      className="text-5xl font-bold tracking-tight"
+                      style={{ color: "var(--text-primary)" }}
+                    >
+                      AltersSearch
+                    </h1>
+                    <p
+                      className="text-lg"
+                      style={{ color: "var(--text-muted)" }}
+                    >
+                      Find the right repo. Instantly.
                     </p>
                   </div>
-                  <SearchBar onSubmit={handleInitialSearch} isLoading={isLoading} />
 
-                  {isLoading ? (
-                    <div className="skeleton-stack">
-                      {[0, 1, 2].map((index) => (
-                        <SkeletonCard key={index} index={index} />
-                      ))}
-                    </div>
-                  ) : (
-                    <>
-                      {enrichedQuery ? <EnrichmentPill query={enrichedQuery} /> : null}
-                      {answer ? <AnswerCard answer={answer} source={sourceForAnswer} /> : null}
+                  {/* Suggestion chips */}
+                  <SuggestionChips onSelect={handleChipSelect} />
 
-                      {results.length === 0 ? (
-                        <div className="empty-results">
-                          <svg viewBox="0 0 24 24" width="40" height="40" aria-hidden="true" style={{ color: "var(--text-muted)" }}>
-                            <path d="m15.5 15.5 4 4M10 18a8 8 0 1 1 5.3-14l-2.5 2.6M9 9h6m-6 4h4" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
-                          </svg>
-                          <h3>No results found</h3>
-                          <p>Try a different query or search the web</p>
-                        </div>
-                      ) : (
-                        <>
-                          <FiltersPanel
-                            sortBy={sortBy}
-                            setSortBy={setSortBy}
-                            filterDomain={filterDomain}
-                            setFilterDomain={setFilterDomain}
-                            filterLanguage={filterLanguage}
-                            setFilterLanguage={setFilterLanguage}
-                            filterArchived={filterArchived}
-                            setFilterArchived={setFilterArchived}
-                            filterFork={filterFork}
-                            setFilterFork={setFilterFork}
-                            clientSearch={clientSearch}
-                            setClientSearch={setClientSearch}
-                            uniqueDomains={uniqueDomains}
-                            uniqueLanguages={uniqueLanguages}
-                          />
+                  {/* Search bar */}
+                  <div className="w-full max-w-[680px]">
+                    <SearchBar
+                      onSubmit={handleSearch}
+                      isLoading={isLoading}
+                      initialValue={query}
+                    />
+                  </div>
 
-                          {filteredResults.length === 0 ? (
-                            <div className="empty-results">
-                              <svg viewBox="0 0 24 24" width="40" height="40" aria-hidden="true" style={{ color: "var(--text-muted)" }}>
-                                <path d="M12 3 3 8l9 5 9-5-9-5Zm-9 9 9 5 9-5m-18 4 9 5 9-5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                              </svg>
-                              <h3>No repositories found</h3>
-                              <p>Try adjusting filters or search terms</p>
-                            </div>
-                          ) : (
-                            <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                              {filteredResults.map((result, index) => (
-                                <ResultCard key={`${result.url}-${index}`} result={result} index={index} />
-                              ))}
-                            </div>
-                          )}
-                        </>
-                      )}
-                    </>
-                  )}
-                </motion.section>
-              ) : null}
+                  {/* Vector search toggle */}
+                  <VectorSearchToggle />
+                </motion.div>
+              )}
+
+              {/* ── Loading view (skeleton grid) ─────────────────────────── */}
+              {viewState === "loading" && (
+                <motion.div
+                  key="loading"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="px-6 py-8"
+                >
+                  <ResultsGrid results={[]} isLoading={true} />
+                </motion.div>
+              )}
+
+              {/* ── Results view ─────────────────────────────────────────── */}
+              {viewState === "results" && (
+                <motion.div
+                  key="results"
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  transition={{ duration: 0.25 }}
+                  className="px-6 py-8"
+                >
+                  {/* Inline search bar at top of results */}
+                  <div className="mb-6 max-w-[680px]">
+                    <SearchBar
+                      onSubmit={handleSearch}
+                      isLoading={isLoading}
+                      initialValue={query}
+                    />
+                  </div>
+
+                  {/* Results grid */}
+                  <ResultsGrid results={results} isLoading={false} />
+                </motion.div>
+              )}
             </AnimatePresence>
-          </div>
-        </main>
+          </main>
+        </div>
       </div>
-    </div>
     </ProtectedRoute>
   );
 }
