@@ -8,8 +8,8 @@ import React, {
   useRef,
   useState,
 } from "react";
-import * as authApi from "@/lib/authApi";
-import { decodeToken, isTokenExpired, isTokenExpiringSoon } from "@/lib/tokenUtils";
+import * as authApi from "../lib/authApi";
+import { decodeToken, isTokenExpired, isTokenExpiringSoon } from "../lib/tokenUtils";
 
 // ---------------------------------------------------------------------------
 // Types
