@@ -205,9 +205,8 @@ export default function HomePage() {
     <div className="app-shell relative overflow-hidden">
       <div className="pointer-events-none absolute inset-0 opacity-[0.35] [background-image:radial-gradient(var(--grid-dot)_0.5px,transparent_0.5px)] [background-size:3px_3px]" />
       <Topbar
-        onToggleMobileNav={() => setMobileNavOpen((value) => !value)}
-        theme={theme}
-        onToggleTheme={() => setTheme((value) => (value === "dark" ? "light" : "dark"))}
+        onToggleSidebar={() => setMobileNavOpen((value) => !value)}
+        sidebarOpen={mobileNavOpen}
       />
       <div className="content-shell mx-auto w-full max-w-[1920px] gap-5 px-0">
         <Sidebar

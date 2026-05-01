@@ -39,9 +39,8 @@ vi.mock("@/contexts/AuthContext", () => ({
 // ---------------------------------------------------------------------------
 
 const defaultProps = {
-  onToggleMobileNav: vi.fn(),
-  theme: "dark" as const,
-  onToggleTheme: vi.fn(),
+  onToggleSidebar: vi.fn(),
+  sidebarOpen: false,
 };
 
 // ---------------------------------------------------------------------------
@@ -149,8 +148,8 @@ describe("Topbar — authenticated state", () => {
     await userEvent.click(screen.getByRole("button", { name: /user menu/i }));
     expect(screen.getByRole("menuitem", { name: /log out/i })).toBeInTheDocument();
 
-    // Click the backdrop (aria-hidden div) — use the first element with fixed inset-0
-    const backdrop = document.querySelector(".fixed.inset-0") as HTMLElement;
+    // Click the backdrop (aria-hidden div) — use data-testid
+    const backdrop = screen.getByTestId("dropdown-backdrop");
     await userEvent.click(backdrop);
 
     expect(screen.queryByRole("menuitem", { name: /log out/i })).not.toBeInTheDocument();

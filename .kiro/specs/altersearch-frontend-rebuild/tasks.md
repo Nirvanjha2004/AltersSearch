@@ -103,24 +103,24 @@ Rebuild the AltersSearch frontend using Aceternity UI primitives, updated design
     - Disable both inputs and the submit button while submitting; set `aria-busy="true"` on the button
     - _Requirements: 3.4, 3.5, 3.6, 4.3, 4.4_
 
-  - [-] 4.5 Implement ShimmerButton submit button
+  - [x] 4.5 Implement ShimmerButton submit button
     - Replace the plain submit button with `<ShimmerButton type="submit">` spanning full width
     - Render a spinner icon and "Signing in…" label while `isSubmitting` is true
     - _Requirements: 4.1, 4.2, 4.4_
 
-- [ ] 5. Rebuild Topbar (`components/Topbar.tsx`)
-  - [ ] 5.1 Implement Topbar layout and sticky positioning
+- [x] 5. Rebuild Topbar (`components/Topbar.tsx`)
+  - [x] 5.1 Implement Topbar layout and sticky positioning
     - Apply `position: sticky; top: 0; height: 56px; backdrop-filter: blur(12px); border-bottom: 1px solid var(--border)`
     - Render "AltersSearch" text + BETA_Badge on the left
     - _Requirements: 5.1, 5.5_
 
-  - [ ] 5.2 Implement unauthenticated and authenticated right-side controls
+  - [x] 5.2 Implement unauthenticated and authenticated right-side controls
     - When `user` is null: render "Give feedback" ghost button, theme toggle icon button (`aria-label`), and "Sign in" link
     - When `user` is set: render "Give feedback" + theme toggle + avatar button (`aria-label`) that opens a dropdown with "Log out"
     - Call `logout()` from `useAuth()` and redirect to `/login` on log out
     - _Requirements: 5.2, 5.3, 5.4_
 
-  - [ ] 5.3 Implement hamburger button for mobile
+  - [x] 5.3 Implement hamburger button for mobile
     - Render a hamburger icon button (`aria-label="Toggle sidebar"`) on the left when viewport < 960 px
     - Accept `onToggleSidebar: () => void` and `sidebarOpen: boolean` props; wire the button to `onToggleSidebar`
     - _Requirements: 5.6, 12.5_
