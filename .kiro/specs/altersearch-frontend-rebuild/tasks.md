@@ -84,26 +84,26 @@ Rebuild the AltersSearch frontend using Aceternity UI primitives, updated design
     - Mount `<Spotlight className="top-0 left-0" fill="purple" />` at the top-left of the viewport
     - _Requirements: 2.1, 2.2_
 
-  - [-] 4.2 Implement the centered auth card with branding
+  - [x] 4.2 Implement the centered auth card with branding
     - Render a card with `max-w-[400px]`, `bg-[var(--card-bg)]`, `border border-[var(--border)]`, `rounded-xl`, `p-8`
     - Render "AltersSearch" logo text in bold `--text-primary` and a BETA_Badge pill with `--glow-accent` border
     - Render `<h1>Sign in to your account</h1>` and subtext with a `<Link href="/register">Create one</Link>` styled in `--accent`
     - _Requirements: 2.3, 2.4, 2.5, 2.6_
 
-  - [ ] 4.3 Implement email and password inputs with focus glow
+  - [x] 4.3 Implement email and password inputs with focus glow
     - Render email `<input type="email">` and password `<input type="password">` each wrapped in a field container
     - Associate each input with a visible `<label>` via `htmlFor` / `id`
     - Apply `focus:ring-2 focus:ring-[var(--accent)]` and border-color transition on focus
     - _Requirements: 3.1, 3.2, 3.3, 12.3_
 
-  - [ ] 4.4 Implement form state and validation logic
+  - [x] 4.4 Implement form state and validation logic
     - Declare `email`, `password`, `error`, and `isSubmitting` state with `useState`
     - On submit: validate non-empty fields first (set `role="alert"` error, return early if invalid)
     - Call `login(email, password)` from `useAuth()`; on success redirect to `searchParams.get("redirect") ?? "/"`; on 401 set error to "Invalid email or password."
     - Disable both inputs and the submit button while submitting; set `aria-busy="true"` on the button
     - _Requirements: 3.4, 3.5, 3.6, 4.3, 4.4_
 
-  - [ ] 4.5 Implement ShimmerButton submit button
+  - [-] 4.5 Implement ShimmerButton submit button
     - Replace the plain submit button with `<ShimmerButton type="submit">` spanning full width
     - Render a spinner icon and "Signing in…" label while `isSubmitting` is true
     - _Requirements: 4.1, 4.2, 4.4_

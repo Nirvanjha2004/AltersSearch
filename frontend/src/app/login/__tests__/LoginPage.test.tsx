@@ -30,7 +30,7 @@ vi.mock("next/navigation", () => ({
 
 const mockLogin = vi.fn();
 
-vi.mock("../../contexts/AuthContext", () => ({
+vi.mock("../../../contexts/AuthContext", () => ({
   useAuth: () => ({ login: mockLogin }),
 }));
 
