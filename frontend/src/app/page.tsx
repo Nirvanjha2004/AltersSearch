@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useCallback } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowUp,
@@ -14,27 +14,29 @@ import {
   Smile,
   Zap,
 } from "lucide-react";
-import IconSidebar from "../components/IconSidebar";
+import Sidebar, { type ChatItem } from "../components/Sidebar";
 import { ResultsGrid } from "../components/ResultsGrid";
 import ProtectedRoute from "../components/ProtectedRoute";
 import { useAuth } from "../contexts/AuthContext";
-import { cn } from "../lib/cn";
 import type { AgentResponse, SearchResult } from "../types";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Action pills config
+// Constants
 // ─────────────────────────────────────────────────────────────────────────────
 
 const ACTION_PILLS = [
-  { id: "code",    label: "Code",        icon: <Code2 size={13} /> },
-  { id: "write",   label: "Write",       icon: <PenLine size={13} /> },
-  { id: "learn",   label: "Learn",       icon: <BookOpen size={13} /> },
-  { id: "life",    label: "Life stuff",  icon: <Smile size={13} /> },
-  { id: "ai",      label: "AI tools",    icon: <Zap size={13} /> },
+  { id: "code",  label: "Code",       icon: <Code2 size={13} /> },
+  { id: "write", label: "Write",      icon: <PenLine size={13} /> },
+  { id: "learn", label: "Learn",      icon: <BookOpen size={13} /> },
+  { id: "life",  label: "Life stuff", icon: <Smile size={13} /> },
+  { id: "ai",    label: "AI tools",   icon: <Zap size={13} /> },
 ] as const;
 
+const SIDEBAR_EXPANDED  = 240;
+const SIDEBAR_COLLAPSED = 64;
+
 // ─────────────────────────────────────────────────────────────────────────────
-// Greeting helper
+// Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
 function getGreeting(): string {
@@ -46,8 +48,8 @@ function getGreeting(): string {
 
 function getFirstName(email: string): string {
   const local = email.split("@")[0] ?? "";
-  const name = local.split(/[._-]/)[0] ?? local;
-  return name.charAt(0).toUpperCase() + name.slice(1);
+  const part  = local.split(/[._-]/)[0] ?? local;
+  return part.charAt(0).toUpperCase() + part.slice(1);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -57,25 +59,25 @@ function getFirstName(email: string): string {
 export default function SearchPage() {
   const { user } = useAuth();
 
-  const [inputValue, setInputValue] = useState("");
-  const [results, setResults] = useState<SearchResult[]>([]);
-  const [recentSearches, setRecentSearches] = useState<string[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [viewState, setViewState] = useState<"empty" | "loading" | "results">("empty");
+  // ── Sidebar state ──────────────────────────────────────────────────────
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [chats, setChats] = useState<ChatItem[]>([]);
+  const [activeChatId, setActiveChatId] = useState<string | undefined>();
+
+  // ── Search state ───────────────────────────────────────────────────────
+  const [inputValue, setInputValue]   = useState("");
+  const [results, setResults]         = useState<SearchResult[]>([]);
+  const [isLoading, setIsLoading]     = useState(false);
+  const [error, setError]             = useState<string | null>(null);
+  const [viewState, setViewState]     = useState<"empty" | "loading" | "results">("empty");
   const [clarification, setClarification] = useState<string | null>(null);
-  const [activeNav, setActiveNav] = useState("search");
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // ── Helpers ────────────────────────────────────────────────────────────
+  // ── Sidebar width for main-content offset ──────────────────────────────
+  const sidebarW = sidebarCollapsed ? SIDEBAR_COLLAPSED : SIDEBAR_EXPANDED;
 
-  const pushRecentSearch = (q: string) => {
-    setRecentSearches((prev) =>
-      [q, ...prev.filter((item) => item !== q)].slice(0, 12)
-    );
-  };
-
+  // ── Auto-resize textarea ───────────────────────────────────────────────
   const autoResize = () => {
     const el = textareaRef.current;
     if (!el) return;
@@ -84,12 +86,16 @@ export default function SearchPage() {
   };
 
   // ── Search ─────────────────────────────────────────────────────────────
-
-  const handleSearch = async (q: string) => {
+  const handleSearch = useCallback(async (q: string) => {
     const query = q.trim();
     if (!query) return;
 
-    pushRecentSearch(query);
+    // Add to chat history
+    const chatId = `chat-${Date.now()}`;
+    const newChat: ChatItem = { id: chatId, title: query };
+    setChats((prev) => [newChat, ...prev].slice(0, 20));
+    setActiveChatId(chatId);
+
     setError(null);
     setClarification(null);
     setIsLoading(true);
@@ -97,17 +103,15 @@ export default function SearchPage() {
 
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
-      const response = await fetch(`${apiUrl}/api/search`, {
+      const res = await fetch(`${apiUrl}/api/search`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query }),
       });
 
-      if (!response.ok) {
-        throw new Error(`Search API responded with status ${response.status}`);
-      }
+      if (!res.ok) throw new Error(`Search API responded with status ${res.status}`);
 
-      const data = (await response.json()) as AgentResponse;
+      const data = (await res.json()) as AgentResponse;
 
       if (data.status === "clarification_needed") {
         setClarification(data.clarification_question ?? data.message ?? null);
@@ -115,7 +119,6 @@ export default function SearchPage() {
         setViewState("empty");
         return;
       }
-
       if (data.status === "error") {
         setError(data.message || "Search failed. Please try again.");
         setResults([]);
@@ -136,12 +139,10 @@ export default function SearchPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   const handleSubmit = () => {
-    if (inputValue.trim()) {
-      handleSearch(inputValue);
-    }
+    if (inputValue.trim()) handleSearch(inputValue);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -151,36 +152,52 @@ export default function SearchPage() {
     }
   };
 
-  const handlePillClick = (label: string) => {
-    setInputValue(label);
-    textareaRef.current?.focus();
-  };
-
-  const handleNewSearch = () => {
+  const handleNewChat = () => {
     setViewState("empty");
     setResults([]);
     setError(null);
     setClarification(null);
     setInputValue("");
-    setTimeout(() => textareaRef.current?.focus(), 100);
+    setActiveChatId(undefined);
+    setTimeout(() => textareaRef.current?.focus(), 80);
+  };
+
+  const handleSelectChat = (id: string) => {
+    setActiveChatId(id);
+    const chat = chats.find((c) => c.id === id);
+    if (chat) {
+      setInputValue(chat.title);
+      handleSearch(chat.title);
+    }
   };
 
   // ── Render ─────────────────────────────────────────────────────────────
-
-  const greeting = getGreeting();
+  const greeting  = getGreeting();
   const firstName = user ? getFirstName(user.email) : "there";
 
   return (
     <ProtectedRoute>
       <div className="app-shell">
-        {/* Icon Sidebar */}
-        <IconSidebar activeItem={activeNav} onItemClick={setActiveNav} />
 
-        {/* Main content */}
-        <div className="main-content">
+        {/* ── Sidebar ─────────────────────────────────────────────────── */}
+        <Sidebar
+          chats={chats}
+          activeChatId={activeChatId}
+          onNewChat={handleNewChat}
+          onSelectChat={handleSelectChat}
+          collapsed={sidebarCollapsed}
+          onCollapsedChange={setSidebarCollapsed}
+        />
+
+        {/* ── Main content — offset tracks sidebar width ──────────────── */}
+        <motion.div
+          className="main-content"
+          animate={{ marginLeft: sidebarW }}
+          transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+        >
           <AnimatePresence mode="wait">
 
-            {/* ── Empty / Hero state ──────────────────────────────────── */}
+            {/* ── Empty / Loading hero ──────────────────────────────── */}
             {(viewState === "empty" || viewState === "loading") && (
               <motion.div
                 key="hero"
@@ -205,7 +222,7 @@ export default function SearchPage() {
                       className="inline-block"
                       aria-hidden="true"
                     >
-                      <Sparkles size={28} className="text-[var(--accent)]" />
+                      <Sparkles size={26} className="text-[var(--accent)]" />
                     </motion.span>
                   </h1>
                   <p className="hero-sub">Find the right repository. Instantly.</p>
@@ -218,12 +235,8 @@ export default function SearchPage() {
                   transition={{ delay: 0.1, duration: 0.3 }}
                   className="w-full max-w-[680px]"
                 >
-                  {/* Error / clarification banners */}
                   {error && (
-                    <div
-                      role="alert"
-                      className="mb-3 rounded-lg border border-red-500/20 bg-red-500/8 px-4 py-3 text-sm text-red-400"
-                    >
+                    <div role="alert" className="mb-3 rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">
                       {error}
                     </div>
                   )}
@@ -240,48 +253,26 @@ export default function SearchPage() {
                       className="input-textarea"
                       placeholder="How can I help you today?"
                       value={inputValue}
-                      onChange={(e) => {
-                        setInputValue(e.target.value);
-                        autoResize();
-                      }}
+                      onChange={(e) => { setInputValue(e.target.value); autoResize(); }}
                       onKeyDown={handleKeyDown}
                       rows={1}
                       aria-label="Search query"
                       disabled={isLoading}
                     />
-
                     <div className="input-bottom-row">
-                      {/* Left: attachment */}
                       <div className="input-bottom-left">
-                        <button
-                          type="button"
-                          aria-label="Attach file"
-                          className="input-icon-btn"
-                        >
+                        <button type="button" aria-label="Attach file" className="input-icon-btn">
                           <Paperclip size={14} />
                         </button>
-
-                        {/* Model selector */}
-                        <button
-                          type="button"
-                          aria-label="Select model"
-                          className="flex items-center gap-1.5 h-[30px] px-3 rounded-[var(--radius-sm)] border border-[var(--border)] bg-transparent text-[var(--text-muted)] text-xs hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] transition-all"
-                        >
+                        <button type="button" aria-label="Select model" className="flex items-center gap-1.5 h-[30px] px-3 rounded-[var(--radius-sm)] border border-[var(--border)] bg-transparent text-[var(--text-muted)] text-xs hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] transition-all">
                           <span>Vector Search</span>
                           <ChevronDown size={11} />
                         </button>
                       </div>
-
-                      {/* Right: voice + send */}
                       <div className="input-bottom-right">
-                        <button
-                          type="button"
-                          aria-label="Voice input"
-                          className="input-icon-btn"
-                        >
+                        <button type="button" aria-label="Voice input" className="input-icon-btn">
                           <Mic size={14} />
                         </button>
-
                         <motion.button
                           type="button"
                           aria-label="Submit search"
@@ -291,11 +282,10 @@ export default function SearchPage() {
                           whileTap={{ scale: 0.93 }}
                           className="send-btn"
                         >
-                          {isLoading ? (
-                            <span className="spinner-sm" aria-hidden="true" />
-                          ) : (
-                            <ArrowUp size={15} />
-                          )}
+                          {isLoading
+                            ? <span className="spinner-sm" aria-hidden="true" />
+                            : <ArrowUp size={15} />
+                          }
                         </motion.button>
                       </div>
                     </div>
@@ -307,7 +297,7 @@ export default function SearchPage() {
                       <motion.button
                         key={pill.id}
                         type="button"
-                        onClick={() => handlePillClick(pill.label)}
+                        onClick={() => { setInputValue(pill.label); textareaRef.current?.focus(); }}
                         whileHover={{ scale: 1.03 }}
                         whileTap={{ scale: 0.97 }}
                         className="action-pill"
@@ -319,7 +309,7 @@ export default function SearchPage() {
                   </div>
                 </motion.div>
 
-                {/* Loading skeleton */}
+                {/* Skeleton while loading */}
                 {viewState === "loading" && (
                   <motion.div
                     initial={{ opacity: 0 }}
@@ -332,7 +322,7 @@ export default function SearchPage() {
               </motion.div>
             )}
 
-            {/* ── Results state ───────────────────────────────────────── */}
+            {/* ── Results ───────────────────────────────────────────── */}
             {viewState === "results" && (
               <motion.div
                 key="results"
@@ -358,7 +348,7 @@ export default function SearchPage() {
                       <div className="input-bottom-left">
                         <button
                           type="button"
-                          onClick={handleNewSearch}
+                          onClick={handleNewChat}
                           className="flex items-center gap-1.5 h-[30px] px-3 rounded-[var(--radius-sm)] border border-[var(--border)] bg-transparent text-[var(--text-muted)] text-xs hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] transition-all"
                         >
                           ← New search
@@ -374,18 +364,16 @@ export default function SearchPage() {
                           whileTap={{ scale: 0.93 }}
                           className="send-btn"
                         >
-                          {isLoading ? (
-                            <span className="spinner-sm" aria-hidden="true" />
-                          ) : (
-                            <ArrowUp size={15} />
-                          )}
+                          {isLoading
+                            ? <span className="spinner-sm" aria-hidden="true" />
+                            : <ArrowUp size={15} />
+                          }
                         </motion.button>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Results count */}
                 <div className="results-header">
                   <p className="results-count">
                     {results.length} {results.length === 1 ? "result" : "results"} found
@@ -397,7 +385,7 @@ export default function SearchPage() {
             )}
 
           </AnimatePresence>
-        </div>
+        </motion.div>
       </div>
     </ProtectedRoute>
   );

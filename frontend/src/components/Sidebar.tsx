@@ -1,220 +1,406 @@
 "use client";
 
-import { Clock3, Compass, Plus, Settings2, Sparkles } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  PanelLeftClose,
+  PanelLeftOpen,
+  SquarePen,
+  MessageSquare,
+  LogOut,
+  Clock,
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "../contexts/AuthContext";
+import { getInitials } from "../lib/tokenUtils";
 import { cn } from "../lib/cn";
 
-// ---------------------------------------------------------------------------
-// Props
-// ---------------------------------------------------------------------------
+// ─────────────────────────────────────────────────────────────────────────────
+// Types
+// ─────────────────────────────────────────────────────────────────────────────
 
-interface SidebarProps {
-  recentSearches: string[];
-  onSelectSearch: (query: string) => void;
-  onNewSearch: () => void;
-  isOpen: boolean;
-  onClose: () => void;
+export interface ChatItem {
+  id: string;
+  title: string;
 }
 
-// ---------------------------------------------------------------------------
-// Sidebar
-// ---------------------------------------------------------------------------
+interface SidebarProps {
+  chats: ChatItem[];
+  activeChatId?: string;
+  onNewChat: () => void;
+  onSelectChat: (id: string) => void;
+  collapsed: boolean;
+  onCollapsedChange: (v: boolean) => void;
+}
 
-export default function Sidebar({
-  recentSearches,
-  onSelectSearch,
-  onNewSearch,
-  isOpen,
-  onClose,
-}: SidebarProps) {
-  // Limit to 12 recent searches as per spec
-  const visibleSearches = recentSearches.slice(0, 12);
+// ─────────────────────────────────────────────────────────────────────────────
+// Tooltip (shown in collapsed mode)
+// ─────────────────────────────────────────────────────────────────────────────
 
+function Tooltip({ label }: { label: string }) {
   return (
-    <>
-      {/* ------------------------------------------------------------------ */}
-      {/* Sidebar panel                                                       */}
-      {/* ------------------------------------------------------------------ */}
-      <aside
-        aria-hidden={!isOpen}
-        aria-label="Sidebar navigation"
-        className={cn(
-          // Base layout
-          "flex w-[240px] flex-shrink-0 flex-col",
-          // Desktop: sticky below topbar, always visible
-          "sticky top-[56px] max-h-[calc(100vh-56px)] overflow-y-auto",
-          // Scrollbar hidden
-          "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
-          // Colors & border
-          "border-r border-[var(--border)]",
-        )}
-        style={{
-          background: "var(--card-bg)",
-          // Mobile: fixed, slide in/out via transform
-          // We use inline style for the responsive transform because Tailwind
-          // doesn't have a built-in 960px breakpoint class.
-        }}
-      >
-        {/* Inner wrapper — handles mobile positioning via a CSS class approach */}
-        <div
-          className={cn(
-            "flex h-full w-full flex-col",
-            // On mobile (< 960px) the aside itself becomes fixed and slides
-            // We apply the mobile styles via a wrapper that uses media queries
-          )}
-        >
-          {/* ---------------------------------------------------------------- */}
-          {/* Workspace section                                                */}
-          {/* ---------------------------------------------------------------- */}
-          <div className="p-4 pb-2">
-            <div className="mb-3 rounded-xl bg-[var(--bg-elevated,#1a1a2e)] p-3">
-              <p className="m-0 inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.1em] text-[var(--text-muted)]">
-                <Sparkles size={11} aria-hidden="true" />
-                Workspace
-              </p>
-              <p className="mb-0 mt-1 text-sm font-medium text-[var(--text-primary)]">
-                Discover repositories faster
-              </p>
-            </div>
+    <span
+      className={cn(
+        "pointer-events-none absolute left-[calc(100%+10px)] top-1/2 -translate-y-1/2 z-50",
+        "whitespace-nowrap rounded-md px-2.5 py-1.5",
+        "bg-[var(--bg-elevated)] border border-[var(--border)]",
+        "text-xs font-medium text-[var(--text-primary)]",
+        "shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-150"
+      )}
+    >
+      {label}
+    </span>
+  );
+}
 
-            {/* "+ New Search" button */}
-            <motion.button
-              type="button"
-              onClick={onNewSearch}
-              whileHover={{ scale: 1.015, filter: "brightness(1.06)" }}
-              whileTap={{ scale: 0.98 }}
-              className={cn(
-                "relative h-10 w-full overflow-hidden rounded-xl",
-                "border border-[color:color-mix(in_srgb,var(--accent)_40%,transparent)]",
-                "text-sm font-medium text-white",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]",
-              )}
-              style={{
-                background: "linear-gradient(120deg, var(--accent), var(--accent-hover, #6d28d9))",
-                boxShadow: "0 10px 24px rgba(109, 40, 217, 0.26)",
-              }}
-              aria-label="Start a new search"
-            >
-              {/* Shimmer overlay */}
-              <span
-                className="pointer-events-none absolute inset-0 opacity-80"
-                style={{
-                  background:
-                    "radial-gradient(300px 60px at 20% -20%, rgba(255,255,255,0.35), transparent 55%)",
-                }}
-                aria-hidden="true"
-              />
-              <span className="relative inline-flex items-center gap-2">
-                <Plus size={15} aria-hidden="true" />
-                New Search
-              </span>
-            </motion.button>
-          </div>
+// ─────────────────────────────────────────────────────────────────────────────
+// SidebarItem — used for "New Chat" and "Chats" nav rows
+// ─────────────────────────────────────────────────────────────────────────────
 
-          {/* ---------------------------------------------------------------- */}
-          {/* Recent Searches section                                          */}
-          {/* ---------------------------------------------------------------- */}
-          <div className="flex-1 p-4 pt-3">
-            <p className="mb-3 inline-flex items-center gap-1.5 text-xs font-medium uppercase tracking-[0.1em] text-[var(--text-muted)]">
-              <Compass size={12} aria-hidden="true" />
-              Recent Searches
-            </p>
-
-            {visibleSearches.length === 0 ? (
-              <p className="text-sm text-[var(--text-muted)]">No searches yet</p>
-            ) : (
-              <ul className="space-y-1.5" role="list" aria-label="Recent searches">
-                {visibleSearches.map((query) => (
-                  <li key={query}>
-                    <motion.button
-                      type="button"
-                      onClick={() => onSelectSearch(query)}
-                      whileHover={{ x: 2 }}
-                      className={cn(
-                        "flex w-full items-center gap-2 rounded-lg border border-transparent",
-                        "px-3 py-2 text-left text-sm text-[var(--text-secondary,#9ca3af)]",
-                        "transition-colors duration-100",
-                        "hover:border-[var(--border)] hover:bg-[var(--bg-elevated,#1a1a2e)] hover:text-[var(--text-primary)]",
-                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]",
-                      )}
-                    >
-                      <Clock3 size={14} className="shrink-0 text-[var(--text-muted)]" aria-hidden="true" />
-                      <span className="truncate">{query}</span>
-                    </motion.button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-
-          {/* ---------------------------------------------------------------- */}
-          {/* Footer: settings + Free badge                                    */}
-          {/* ---------------------------------------------------------------- */}
-          <div className="flex items-center justify-between border-t border-[var(--border)] p-4">
-            <motion.button
-              type="button"
-              aria-label="Settings"
-              whileHover={{ scale: 1.04 }}
-              whileTap={{ scale: 0.97 }}
-              className={cn(
-                "inline-flex h-8 w-8 items-center justify-center rounded-md",
-                "border border-[var(--border)] bg-transparent text-[var(--text-muted)]",
-                "transition-colors hover:border-[var(--accent)] hover:text-[var(--text-primary)]",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]",
-              )}
-            >
-              <Settings2 size={16} aria-hidden="true" />
-            </motion.button>
-
-            {/* "Free" badge in --accent color */}
-            <span
-              className="rounded-full border px-3 py-1 text-xs font-medium"
-              style={{
-                color: "var(--accent)",
-                borderColor: "color-mix(in srgb, var(--accent) 28%, transparent)",
-                background: "color-mix(in srgb, var(--accent) 10%, transparent)",
-              }}
-            >
-              Free
-            </span>
-          </div>
-        </div>
-      </aside>
-
-      {/* ------------------------------------------------------------------ */}
-      {/* Mobile backdrop overlay — only rendered when sidebar is open       */}
-      {/* ------------------------------------------------------------------ */}
-      {isOpen && (
-        <button
-          type="button"
-          aria-label="Close navigation"
-          onClick={onClose}
-          className="mobile-backdrop fixed inset-0 z-[54] border-0 bg-black/45"
-          style={{ top: "56px" }}
-        />
+function SidebarNavItem({
+  icon,
+  label,
+  active,
+  collapsed,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  active?: boolean;
+  collapsed: boolean;
+  onClick?: () => void;
+}) {
+  return (
+    <motion.button
+      type="button"
+      aria-label={label}
+      onClick={onClick}
+      whileHover={{ scale: 1.02 }}
+      whileTap={{ scale: 0.97 }}
+      className={cn(
+        "group relative flex w-full items-center gap-3 rounded-lg px-2.5 py-2",
+        "text-sm font-medium transition-all duration-150 cursor-pointer",
+        "border border-transparent",
+        active
+          ? "bg-[var(--accent-soft)] border-[rgba(255,120,73,0.2)] text-[var(--accent)]"
+          : "text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)]",
+        collapsed && "justify-center px-2"
+      )}
+    >
+      {/* Active indicator bar */}
+      {active && (
+        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4 rounded-full bg-[var(--accent)]" />
       )}
 
-      {/* ------------------------------------------------------------------ */}
-      {/* Mobile slide-in styles injected via a <style> tag                  */}
-      {/* The spec requires < 960px breakpoint which isn't a standard        */}
-      {/* Tailwind breakpoint, so we use a scoped style block.               */}
-      {/* ------------------------------------------------------------------ */}
-      <style>{`
-        @media (max-width: 959px) {
-          aside[aria-label="Sidebar navigation"] {
-            position: fixed !important;
-            top: 56px !important;
-            left: 0 !important;
-            height: calc(100vh - 56px) !important;
-            z-index: 55;
-            transform: translateX(-100%);
-            transition: transform 0.22s ease;
-          }
-          aside[aria-label="Sidebar navigation"][aria-hidden="false"] {
-            transform: translateX(0);
-          }
-        }
-      `}</style>
-    </>
+      <span className="flex-shrink-0">{icon}</span>
+
+      <AnimatePresence initial={false}>
+        {!collapsed && (
+          <motion.span
+            initial={{ opacity: 0, width: 0 }}
+            animate={{ opacity: 1, width: "auto" }}
+            exit={{ opacity: 0, width: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden whitespace-nowrap"
+          >
+            {label}
+          </motion.span>
+        )}
+      </AnimatePresence>
+
+      {collapsed && <Tooltip label={label} />}
+    </motion.button>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ChatListItem
+// ─────────────────────────────────────────────────────────────────────────────
+
+function ChatListItem({
+  chat,
+  active,
+  collapsed,
+  onClick,
+}: {
+  chat: ChatItem;
+  active: boolean;
+  collapsed: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <motion.button
+      type="button"
+      onClick={onClick}
+      whileHover={{ x: collapsed ? 0 : 2 }}
+      className={cn(
+        "group relative flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2",
+        "text-left text-sm transition-all duration-150 cursor-pointer border border-transparent",
+        active
+          ? "bg-[var(--bg-elevated)] border-[var(--border)] text-[var(--text-primary)]"
+          : "text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)]",
+        collapsed && "justify-center px-2"
+      )}
+    >
+      {active && (
+        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4 rounded-full bg-[var(--accent)]" />
+      )}
+
+      <Clock
+        size={13}
+        className={cn(
+          "flex-shrink-0 transition-colors",
+          active ? "text-[var(--accent)]" : "text-[var(--text-muted)]"
+        )}
+        aria-hidden="true"
+      />
+
+      <AnimatePresence initial={false}>
+        {!collapsed && (
+          <motion.span
+            initial={{ opacity: 0, width: 0 }}
+            animate={{ opacity: 1, width: "auto" }}
+            exit={{ opacity: 0, width: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden whitespace-nowrap text-ellipsis min-w-0 flex-1"
+          >
+            <span className="block truncate">{chat.title}</span>
+          </motion.span>
+        )}
+      </AnimatePresence>
+
+      {collapsed && <Tooltip label={chat.title} />}
+    </motion.button>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// UserProfileSection
+// ─────────────────────────────────────────────────────────────────────────────
+
+function UserProfileSection({
+  collapsed,
+  onLogout,
+}: {
+  collapsed: boolean;
+  onLogout: () => void;
+}) {
+  const { user } = useAuth();
+  const initials = user ? getInitials(user.email) : "?";
+  const displayName = user
+    ? (user.email.split("@")[0] ?? user.email)
+        .split(/[._-]/)[0]
+        ?.replace(/^./, (c) => c.toUpperCase()) ?? user.email
+    : "User";
+
+  return (
+    <div
+      className={cn(
+        "flex items-center gap-3 rounded-lg px-2.5 py-2",
+        "border border-transparent hover:bg-[var(--bg-elevated)] transition-colors",
+        collapsed && "justify-center px-2"
+      )}
+    >
+      {/* Avatar */}
+      <div
+        className={cn(
+          "flex-shrink-0 flex items-center justify-center rounded-full",
+          "w-7 h-7 text-[11px] font-semibold",
+          "bg-[var(--accent-soft)] border border-[rgba(255,120,73,0.3)] text-[var(--accent)]"
+        )}
+        aria-hidden="true"
+      >
+        {initials}
+      </div>
+
+      <AnimatePresence initial={false}>
+        {!collapsed && (
+          <motion.div
+            initial={{ opacity: 0, width: 0 }}
+            animate={{ opacity: 1, width: "auto" }}
+            exit={{ opacity: 0, width: 0 }}
+            transition={{ duration: 0.2 }}
+            className="flex flex-1 items-center justify-between overflow-hidden min-w-0"
+          >
+            <span className="truncate text-sm font-medium text-[var(--text-primary)]">
+              {displayName}
+            </span>
+            <motion.button
+              type="button"
+              aria-label="Sign out"
+              onClick={onLogout}
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.93 }}
+              className={cn(
+                "ml-2 flex-shrink-0 flex items-center justify-center",
+                "w-6 h-6 rounded-md text-[var(--text-muted)]",
+                "hover:text-[var(--text-primary)] hover:bg-[var(--border)] transition-colors"
+              )}
+            >
+              <LogOut size={13} aria-hidden="true" />
+            </motion.button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Collapsed: show logout tooltip */}
+      {collapsed && (
+        <span className="sr-only">{displayName}</span>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Sidebar (main export)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export default function Sidebar({
+  chats,
+  activeChatId,
+  onNewChat,
+  onSelectChat,
+  collapsed,
+  onCollapsedChange,
+}: SidebarProps) {
+  const { logout } = useAuth();
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    await logout();
+    router.push("/login");
+  };
+
+  const EXPANDED_W = 240;
+  const COLLAPSED_W = 64;
+
+  return (
+    <motion.aside
+      animate={{ width: collapsed ? COLLAPSED_W : EXPANDED_W }}
+      transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+      className={cn(
+        "fixed top-0 left-0 h-screen z-50 flex flex-col",
+        "bg-[var(--bg-surface)] border-r border-[var(--border)]",
+        "overflow-hidden select-none"
+      )}
+      aria-label="Main navigation"
+    >
+      {/* ── Header ──────────────────────────────────────────────────────── */}
+      <div
+        className={cn(
+          "flex items-center h-14 px-3 flex-shrink-0",
+          "border-b border-[var(--border)]",
+          collapsed ? "justify-center" : "justify-between"
+        )}
+      >
+        {/* Logo */}
+        <AnimatePresence initial={false}>
+          {!collapsed && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className="flex items-center gap-2.5 overflow-hidden"
+            >
+              <div
+                className={cn(
+                  "flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center",
+                  "bg-[var(--accent)] text-white text-xs font-bold",
+                  "shadow-[0_0_12px_rgba(255,120,73,0.3)]"
+                )}
+                aria-hidden="true"
+              >
+                A
+              </div>
+              <span className="text-sm font-semibold text-[var(--text-primary)] tracking-tight whitespace-nowrap">
+                AltersSearch
+              </span>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Collapse toggle */}
+        <motion.button
+          type="button"
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          onClick={() => onCollapsedChange(!collapsed)}
+          whileHover={{ scale: 1.08 }}
+          whileTap={{ scale: 0.93 }}
+          className={cn(
+            "group relative flex-shrink-0 flex items-center justify-center",
+            "w-7 h-7 rounded-md text-[var(--text-muted)]",
+            "hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] transition-colors"
+          )}
+        >
+          {collapsed ? (
+            <PanelLeftOpen size={15} aria-hidden="true" />
+          ) : (
+            <PanelLeftClose size={15} aria-hidden="true" />
+          )}
+          {collapsed && <Tooltip label="Expand sidebar" />}
+        </motion.button>
+      </div>
+
+      {/* ── Main nav ────────────────────────────────────────────────────── */}
+      <div className="flex flex-col gap-1 px-2 pt-3 flex-shrink-0">
+        {/* New Chat */}
+        <SidebarNavItem
+          icon={<SquarePen size={15} aria-hidden="true" />}
+          label="New Chat"
+          collapsed={collapsed}
+          onClick={onNewChat}
+        />
+
+        {/* Chats section header */}
+        <SidebarNavItem
+          icon={<MessageSquare size={15} aria-hidden="true" />}
+          label="Chats"
+          collapsed={collapsed}
+        />
+      </div>
+
+      {/* ── Divider ─────────────────────────────────────────────────────── */}
+      <div className="mx-3 my-2 h-px bg-[var(--border)] flex-shrink-0" />
+
+      {/* ── Chat list ───────────────────────────────────────────────────── */}
+      <div
+        className={cn(
+          "flex-1 overflow-y-auto px-2 pb-2",
+          "scrollbar-thin scrollbar-thumb-[var(--border)] scrollbar-track-transparent"
+        )}
+      >
+        {chats.length === 0 ? (
+          <AnimatePresence initial={false}>
+            {!collapsed && (
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="px-2.5 py-2 text-xs text-[var(--text-muted)]"
+              >
+                No chats yet
+              </motion.p>
+            )}
+          </AnimatePresence>
+        ) : (
+          <div className="flex flex-col gap-0.5">
+            {chats.map((chat) => (
+              <ChatListItem
+                key={chat.id}
+                chat={chat}
+                active={chat.id === activeChatId}
+                collapsed={collapsed}
+                onClick={() => onSelectChat(chat.id)}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── Footer / User ───────────────────────────────────────────────── */}
+      <div className="flex-shrink-0 border-t border-[var(--border)] px-2 py-3">
+        <UserProfileSection collapsed={collapsed} onLogout={handleLogout} />
+      </div>
+    </motion.aside>
   );
 }
