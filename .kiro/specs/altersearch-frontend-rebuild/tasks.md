@@ -125,25 +125,25 @@ Rebuild the AltersSearch frontend using Aceternity UI primitives, updated design
     - Accept `onToggleSidebar: () => void` and `sidebarOpen: boolean` props; wire the button to `onToggleSidebar`
     - _Requirements: 5.6, 12.5_
 
-- [ ] 6. Rebuild Sidebar (`components/Sidebar.tsx`)
-  - [ ] 6.1 Implement Sidebar layout and desktop positioning
+- [x] 6. Rebuild Sidebar (`components/Sidebar.tsx`)
+  - [x] 6.1 Implement Sidebar layout and desktop positioning
     - Render a `240px`-wide panel with `background: var(--card-bg)` and `border-right: 1px solid var(--border)`
     - Position sticky below the Topbar on desktop (≥ 960 px)
     - Accept `recentSearches`, `onSelectSearch`, `onNewSearch`, `isOpen`, and `onClose` props
     - _Requirements: 6.1_
 
-  - [ ] 6.2 Implement workspace section and "+ New Search" button
+  - [x] 6.2 Implement workspace section and "+ New Search" button
     - Render "Workspace" label and "Discover repositories faster" heading
     - Render a "+ New Search" button with purple gradient background and glow shadow; call `onNewSearch` on click
     - _Requirements: 6.2, 6.3_
 
-  - [ ] 6.3 Implement Recent Searches list
+  - [x] 6.3 Implement Recent Searches list
     - Render up to 12 items from `recentSearches`; each item calls `onSelectSearch(query)` on click
     - When `recentSearches` is empty, render "No searches yet" in `--text-muted`
     - Render "Free" badge at the bottom in `--accent` color
     - _Requirements: 6.4, 6.5, 6.6_
 
-  - [ ] 6.4 Implement mobile slide-in behavior
+  - [x] 6.4 Implement mobile slide-in behavior
     - Below 960 px: apply `position: fixed; transform: translateX(-100%)` by default; slide in when `isOpen` is true
     - Set `aria-hidden={!isOpen}` on the sidebar element
     - Render a backdrop overlay when open that calls `onClose` on click

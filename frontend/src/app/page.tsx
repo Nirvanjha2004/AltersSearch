@@ -213,9 +213,8 @@ export default function HomePage() {
           recentSearches={recentSearches}
           onSelectSearch={handleInitialSearch}
           onNewSearch={resetSearch}
-          isMobileOpen={mobileNavOpen}
-          onCloseMobile={() => setMobileNavOpen(false)}
-          activeQuery={originalQuery}
+          isOpen={mobileNavOpen}
+          onClose={() => setMobileNavOpen(false)}
         />
 
         <main className="main-area min-w-0">
