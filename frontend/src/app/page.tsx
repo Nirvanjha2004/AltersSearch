@@ -4,9 +4,6 @@ import { useRef, useState, useCallback } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowUp,
-  Paperclip,
-  Mic,
-  ChevronDown,
   Sparkles,
 } from "lucide-react";
 import Sidebar, { type ChatItem } from "../components/Sidebar";
@@ -256,19 +253,8 @@ export default function SearchPage() {
                       disabled={isLoading}
                     />
                     <div className="input-bottom-row">
-                      <div className="input-bottom-left">
-                        <button type="button" aria-label="Attach file" className="input-icon-btn">
-                          <Paperclip size={14} />
-                        </button>
-                        <button type="button" aria-label="Select model" className="flex items-center gap-1.5 h-[30px] px-3 rounded-[var(--radius-sm)] border border-[var(--border)] bg-transparent text-[var(--text-muted)] text-xs hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] transition-all">
-                          <span>Vector Search</span>
-                          <ChevronDown size={11} />
-                        </button>
-                      </div>
+                      <div className="input-bottom-left" />
                       <div className="input-bottom-right">
-                        <button type="button" aria-label="Voice input" className="input-icon-btn">
-                          <Mic size={14} />
-                        </button>
                         <motion.button
                           type="button"
                           aria-label="Submit search"
@@ -288,13 +274,15 @@ export default function SearchPage() {
                   </div>
 
                   {/* Smart search chips */}
-                  <SearchChips
-                    onSelect={(query) => {
-                      setInputValue(query);
-                      textareaRef.current?.focus();
-                      void handleSearch(query);
-                    }}
-                  />
+                  <div className="mt-5">
+                    <SearchChips
+                      onSelect={(query) => {
+                        setInputValue(query);
+                        textareaRef.current?.focus();
+                        void handleSearch(query);
+                      }}
+                    />
+                  </div>
                 </motion.div>
 
                 {/* Skeleton while loading */}
