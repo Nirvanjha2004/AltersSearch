@@ -165,7 +165,7 @@ Rebuild the AltersSearch frontend using Aceternity UI primitives, updated design
     - Call `onSelect(label)` on click; apply hover state with `--accent` border
     - _Requirements: 7.3, 7.4_
 
-- [ ] 9. Create VectorSearchToggle component (`components/VectorSearchToggle.tsx`)
+- [-] 9. Create VectorSearchToggle component (`components/VectorSearchToggle.tsx`)
   - [ ] 9.1 Implement VectorSearchToggle display chip
     - Render a stateless pill displaying "✦ VECTOR SEARCH"
     - Style with `text-[var(--accent)] border border-[var(--accent)/30] bg-[var(--accent)/10] rounded-full px-3 py-1 text-xs font-medium`
