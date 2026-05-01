@@ -72,7 +72,8 @@ export function PlaceholderAndVanishInput({
         aria-label="Submit search"
         className={cn(
           "absolute right-2 flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--accent)] text-white transition-all",
-          "hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+          "hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--card-bg)]"
         )}
       >
         {isLoading ? (

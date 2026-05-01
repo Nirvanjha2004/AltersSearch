@@ -28,6 +28,7 @@ export function ShimmerButton({
         "relative inline-flex h-10 w-full items-center justify-center overflow-hidden rounded-lg border border-[var(--accent)] bg-[var(--accent)] px-6 font-medium text-white transition-all duration-300",
         "before:absolute before:inset-0 before:-translate-x-full before:animate-[shimmer-slide_2s_infinite] before:bg-gradient-to-r before:from-transparent before:via-white/20 before:to-transparent",
         "hover:shadow-[0_0_20px_rgba(124,58,237,0.5)] hover:brightness-110",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-base)]",
         "disabled:cursor-not-allowed disabled:opacity-50",
         className
       )}

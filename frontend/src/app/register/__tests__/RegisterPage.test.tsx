@@ -39,7 +39,7 @@ import * as authApi from "../../../lib/authApi";
 
 const mockLogin = vi.fn();
 
-vi.mock("../../contexts/AuthContext", () => ({
+vi.mock("../../../contexts/AuthContext", () => ({
   useAuth: () => ({ login: mockLogin }),
 }));
 

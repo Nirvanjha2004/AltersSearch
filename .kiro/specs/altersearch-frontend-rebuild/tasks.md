@@ -234,26 +234,26 @@ Rebuild the AltersSearch frontend using Aceternity UI primitives, updated design
     - Render error banner with `role="alert"` when `error` is set
     - _Requirements: 7.7, 8.2, 8.4_
 
-- [ ] 14. Checkpoint — verify integration
+- [x] 14. Checkpoint — verify integration
   - Ensure all TypeScript types resolve without errors by running `npx tsc --noEmit` inside `frontend/`
   - Ensure all existing tests still pass by running `npm test` inside `frontend/`
   - Verify the `cn()` utility, design tokens, and Aceternity UI components are imported correctly across all new files
   - Ask the user if any visual or behavioral adjustments are needed before proceeding.
 
-- [ ] 15. Accessibility audit and final polish
-  - [ ] 15.1 Audit all icon-only buttons for `aria-label`
+- [x] 15. Accessibility audit and final polish
+  - [x] 15.1 Audit all icon-only buttons for `aria-label`
     - Confirm hamburger, theme toggle, and avatar buttons each have a descriptive `aria-label`
     - _Requirements: 12.5_
 
-  - [ ] 15.2 Audit focus indicators across all interactive elements
+  - [x] 15.2 Audit focus indicators across all interactive elements
     - Confirm `focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:outline-none` is applied to all buttons, inputs, and links
     - _Requirements: 12.2_
 
-  - [ ] 15.3 Audit RepoCard keyboard navigation
+  - [x] 15.3 Audit RepoCard keyboard navigation
     - Confirm `role="button"`, `tabIndex={0}`, and `onKeyDown` (Enter/Space → open GitHub URL) are present on clickable cards
     - _Requirements: 12.4_
 
-  - [ ] 15.4 Audit all `role="alert"` error elements
+  - [x] 15.4 Audit all `role="alert"` error elements
     - Confirm Sign In page validation errors, 401 errors, and Search page error banners all use `role="alert"`
     - _Requirements: 12.6_
 
