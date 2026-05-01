@@ -23,6 +23,7 @@ interface User {
 interface AuthContextValue {
   user: User | null;
   isAuthenticated: boolean;
+  isLoading: boolean;
   login(email: string, password: string): Promise<void>;
   logout(): Promise<void>;
 }
@@ -42,6 +43,8 @@ const REFRESH_TOKEN_KEY = "auth_refresh_token";
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
+  // True until the initial session-restoration attempt completes.
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   // Ref so the proactive-refresh timer always sees the latest tokens without
   // needing to be recreated on every state change.
@@ -130,15 +133,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const storedRefreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
-    if (!storedRefreshToken) return;
+    if (!storedRefreshToken) {
+      setIsLoading(false);
+      return;
+    }
 
     // If we have an access token in state that is still valid, just schedule
     // the proactive refresh. Otherwise, do a silent refresh now.
     const currentToken = accessTokenRef.current;
     if (currentToken && !isTokenExpired(currentToken)) {
       scheduleProactiveRefresh(currentToken, storedRefreshToken);
+      setIsLoading(false);
     } else {
-      void silentRefresh(storedRefreshToken);
+      void silentRefresh(storedRefreshToken).finally(() => setIsLoading(false));
     }
 
     return () => {
@@ -176,6 +183,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const value: AuthContextValue = {
     user,
     isAuthenticated: user !== null,
+    isLoading,
     login,
     logout,
   };
