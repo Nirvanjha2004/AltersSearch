@@ -86,16 +86,8 @@ export default function SearchPage() {
   };
 
   // ── Search ─────────────────────────────────────────────────────────────
-  const handleSearch = useCallback(async (q: string) => {
-    const query = q.trim();
-    if (!query) return;
-
-    // Add to chat history
-    const chatId = `chat-${Date.now()}`;
-    const newChat: ChatItem = { id: chatId, title: query };
-    setChats((prev) => [newChat, ...prev].slice(0, 20));
-    setActiveChatId(chatId);
-
+  // Core search — does NOT touch the chat list (used for re-runs)
+  const runSearch = useCallback(async (query: string) => {
     setError(null);
     setClarification(null);
     setIsLoading(true);
@@ -141,6 +133,18 @@ export default function SearchPage() {
     }
   }, []);
 
+  // New search from input — adds a new chat entry
+  const handleSearch = useCallback(async (q: string) => {
+    const query = q.trim();
+    if (!query) return;
+
+    const chatId = `chat-${Date.now()}`;
+    setChats((prev) => [{ id: chatId, title: query }, ...prev].slice(0, 20));
+    setActiveChatId(chatId);
+
+    await runSearch(query);
+  }, [runSearch]);
+
   const handleSubmit = () => {
     if (inputValue.trim()) handleSearch(inputValue);
   };
@@ -167,7 +171,7 @@ export default function SearchPage() {
     const chat = chats.find((c) => c.id === id);
     if (chat) {
       setInputValue(chat.title);
-      handleSearch(chat.title);
+      void runSearch(chat.title);
     }
   };
 

@@ -5,7 +5,6 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   SquarePen,
-  MessageSquare,
   LogOut,
   Clock,
 } from "lucide-react";
@@ -349,13 +348,6 @@ export default function Sidebar({
           label="New Chat"
           collapsed={collapsed}
           onClick={onNewChat}
-        />
-
-        {/* Chats section header */}
-        <SidebarNavItem
-          icon={<MessageSquare size={15} aria-hidden="true" />}
-          label="Chats"
-          collapsed={collapsed}
         />
       </div>
 
