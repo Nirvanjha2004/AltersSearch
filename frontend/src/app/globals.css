@@ -68,7 +68,6 @@ html, body {
    ───────────────────────────────────────────────────────────────────────── */
 :focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--accent);
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -148,8 +147,8 @@ html, body {
 }
 
 .input-card:focus-within {
-  border-color: rgba(255,120,73,0.4);
-  box-shadow: var(--shadow-lg), 0 0 0 3px var(--accent-glow);
+  border-color: #3A3A3A;
+  box-shadow: var(--shadow-lg);
 }
 
 .input-textarea {
