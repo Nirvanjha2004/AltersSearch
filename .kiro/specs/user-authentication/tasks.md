@@ -106,8 +106,8 @@ Implement dual-token JWT authentication across repo-api (Node.js/Express) and th
 - [ ] 6. Checkpoint — backend tests pass
   - Run `npm test` in `repo-api`; ensure all property and unit tests pass. Ask the user if questions arise.
 
-- [ ] 7. Implement frontend utility libraries
-  - [ ] 7.1 Create `frontend/src/lib/tokenUtils.ts`
+- [x] 7. Implement frontend utility libraries
+  - [x] 7.1 Create `frontend/src/lib/tokenUtils.ts`
     - Implement `decodeToken(token)`, `isTokenExpired(token)`, `isTokenExpiringSoon(token, thresholdSeconds = 60)`, `getInitials(email)`
     - _Requirements: 8.2, 8.3, 10.1_
 
@@ -116,7 +116,7 @@ Implement dual-token JWT authentication across repo-api (Node.js/Express) and th
     - Unit tests for `decodeToken`, `isTokenExpired`, `isTokenExpiringSoon`
     - **Validates: Requirements 8.2, 8.3, 10.1**
 
-  - [ ] 7.3 Create `frontend/src/lib/authApi.ts`
+  - [x] 7.3 Create `frontend/src/lib/authApi.ts`
     - Implement typed `register`, `login`, `refresh`, `logout` wrappers using `fetch` against `NEXT_PUBLIC_API_URL`
     - _Requirements: 6.2, 7.3, 8.3, 4.1_
 
