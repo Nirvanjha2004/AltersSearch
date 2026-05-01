@@ -13,6 +13,7 @@ import SearchBar from "../components/SearchBar";
 import Sidebar from "../components/Sidebar";
 import SkeletonCard from "../components/SkeletonCard";
 import Topbar from "../components/Topbar";
+import ProtectedRoute from "@/components/ProtectedRoute";
 import type { AgentResponse, SearchRequest, SearchResult } from "../types";
 
 type ViewState = "search" | "clarification" | "results";
@@ -200,6 +201,7 @@ export default function HomePage() {
   }, [theme]);
 
   return (
+    <ProtectedRoute>
     <div className="app-shell relative overflow-hidden">
       <div className="pointer-events-none absolute inset-0 opacity-[0.35] [background-image:radial-gradient(var(--grid-dot)_0.5px,transparent_0.5px)] [background-size:3px_3px]" />
       <Topbar
@@ -340,5 +342,6 @@ export default function HomePage() {
         </main>
       </div>
     </div>
+    </ProtectedRoute>
   );
 }

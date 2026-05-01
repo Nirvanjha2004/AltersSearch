@@ -173,12 +173,12 @@ Implement dual-token JWT authentication across repo-api (Node.js/Express) and th
     - Unit tests for 409 error display and auto-login on success
     - **Validates: Requirements 7.1, 7.2, 7.3, 7.4, 7.5**
 
-- [ ] 11. Protect the home page and update Topbar
-  - [ ] 11.1 Wrap the home page (`frontend/src/app/page.tsx`) with `ProtectedRoute`
+- [x] 11. Protect the home page and update Topbar
+  - [x] 11.1 Wrap the home page (`frontend/src/app/page.tsx`) with `ProtectedRoute`
     - Import and render `<ProtectedRoute>` around the page content
     - _Requirements: 9.3_
 
-  - [ ] 11.2 Update `frontend/src/components/Topbar.tsx` to consume `AuthContext`
+  - [x] 11.2 Update `frontend/src/components/Topbar.tsx` to consume `AuthContext`
     - When authenticated: replace hardcoded "NJ" avatar with `getInitials(user.email)`; add click handler to open dropdown with "Log out" option
     - When not authenticated: replace avatar button with a "Sign in" link pointing to `/login`
     - Clicking "Log out" calls `useAuth().logout()` then redirects to `/login`

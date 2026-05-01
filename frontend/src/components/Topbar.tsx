@@ -1,5 +1,12 @@
+"use client";
+
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { Moon, Sun } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/contexts/AuthContext";
+import { getInitials } from "@/lib/tokenUtils";
 
 type TopbarProps = {
   onToggleMobileNav: () => void;
@@ -8,6 +15,16 @@ type TopbarProps = {
 };
 
 export default function Topbar({ onToggleMobileNav, theme, onToggleTheme }: TopbarProps) {
+  const { isAuthenticated, user, logout } = useAuth();
+  const router = useRouter();
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+
+  const handleLogout = async () => {
+    setDropdownOpen(false);
+    await logout();
+    router.push("/login");
+  };
+
   return (
     <header className="topbar px-4">
       <div className="topbar-left">
@@ -39,7 +56,55 @@ export default function Topbar({ onToggleMobileNav, theme, onToggleTheme }: Topb
         >
           {theme === "dark" ? <Sun size={14} /> : <Moon size={14} />}
         </motion.button>
-        <motion.button className="avatar" aria-label="User menu" type="button" whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.96 }}>NJ</motion.button>
+
+        {isAuthenticated && user ? (
+          <div className="relative">
+            <motion.button
+              className="avatar"
+              aria-label="User menu"
+              aria-expanded={dropdownOpen}
+              aria-haspopup="true"
+              type="button"
+              onClick={() => setDropdownOpen((prev) => !prev)}
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.96 }}
+            >
+              {getInitials(user.email)}
+            </motion.button>
+
+            {dropdownOpen && (
+              <>
+                {/* Backdrop to close dropdown when clicking outside */}
+                <div
+                  className="fixed inset-0 z-10"
+                  aria-hidden="true"
+                  onClick={() => setDropdownOpen(false)}
+                />
+                <div
+                  className="absolute right-0 z-20 mt-1 min-w-[120px] rounded-lg border border-[var(--border)] bg-[var(--surface)] py-1 shadow-lg"
+                  role="menu"
+                  aria-label="User menu"
+                >
+                  <button
+                    className="w-full px-4 py-2 text-left text-sm text-[var(--text-primary)] hover:bg-[var(--surface-hover)] focus:outline-none"
+                    role="menuitem"
+                    type="button"
+                    onClick={handleLogout}
+                  >
+                    Log out
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        ) : (
+          <Link
+            href="/login"
+            className="ghost-button text-sm font-medium text-[var(--text-primary)] hover:text-[var(--accent)]"
+          >
+            Sign in
+          </Link>
+        )}
       </div>
     </header>
   );
