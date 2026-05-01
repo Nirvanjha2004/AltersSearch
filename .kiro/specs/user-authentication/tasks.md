@@ -148,8 +148,8 @@ Implement dual-token JWT authentication across repo-api (Node.js/Express) and th
     - Unit tests for authenticated pass-through and redirect query parameter preservation
     - **Validates: Requirements 9.1, 9.2**
 
-- [ ] 10. Implement login and registration pages
-  - [ ] 10.1 Create `frontend/src/app/login/page.tsx`
+- [x] 10. Implement login and registration pages
+  - [x] 10.1 Create `frontend/src/app/login/page.tsx`
     - Render email input, password input, and submit button
     - Client-side validation: show error and block request if either field is empty/whitespace
     - On submit: call `useAuth().login`; on success redirect to `redirect` query param or `/`; on 401 show "Invalid email or password." inline
@@ -161,7 +161,7 @@ Implement dual-token JWT authentication across repo-api (Node.js/Express) and th
     - Unit tests for 401 error display, loading state, redirect-on-success
     - **Validates: Requirements 6.1, 6.2, 6.3, 6.4, 6.5**
 
-  - [ ] 10.3 Create `frontend/src/app/register/page.tsx`
+  - [x] 10.3 Create `frontend/src/app/register/page.tsx`
     - Render email, password, confirm-password inputs and submit button
     - Client-side validation: reject mismatched passwords and passwords < 8 chars before any request
     - On 201: call `useAuth().login` automatically then redirect to `/`; on 409 show "An account with this email already exists." inline
