@@ -190,7 +190,7 @@ Implement dual-token JWT authentication across repo-api (Node.js/Express) and th
     - Test unauthenticated state ("Sign in" link visible, avatar absent)
     - **Validates: Requirements 10.1, 10.2, 10.3, 10.4**
 
-- [ ] 12. Final checkpoint — all tests pass
+- [x] 12. Final checkpoint — all tests pass
   - Run `npm test -- --run` in `frontend` and `npm test` in `repo-api`; ensure all tests pass. Ask the user if questions arise.
 
 ## Notes

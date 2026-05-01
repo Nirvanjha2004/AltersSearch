@@ -5,8 +5,8 @@ import { motion } from "framer-motion";
 import { Moon, Sun } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/contexts/AuthContext";
-import { getInitials } from "@/lib/tokenUtils";
+import { useAuth } from "../contexts/AuthContext";
+import { getInitials } from "../lib/tokenUtils";
 
 type TopbarProps = {
   onToggleMobileNav: () => void;

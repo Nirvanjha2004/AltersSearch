@@ -3,8 +3,8 @@
 import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useAuth } from "@/contexts/AuthContext";
-import * as authApi from "@/lib/authApi";
+import { useAuth } from "../../contexts/AuthContext";
+import * as authApi from "../../lib/authApi";
 
 export default function RegisterPage() {
   const { login } = useAuth();

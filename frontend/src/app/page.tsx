@@ -13,7 +13,7 @@ import SearchBar from "../components/SearchBar";
 import Sidebar from "../components/Sidebar";
 import SkeletonCard from "../components/SkeletonCard";
 import Topbar from "../components/Topbar";
-import ProtectedRoute from "@/components/ProtectedRoute";
+import ProtectedRoute from "../components/ProtectedRoute";
 import type { AgentResponse, SearchRequest, SearchResult } from "../types";
 
 type ViewState = "search" | "clarification" | "results";
