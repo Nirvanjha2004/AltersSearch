@@ -1,5 +1,6 @@
 import "./globals.css";
 import { Inter, JetBrains_Mono } from "next/font/google";
+import Providers from "@/components/Providers";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -25,7 +26,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" data-theme="dark">
-      <body className={`${inter.variable} ${jetbrainsMono.variable}`}>{children}</body>
+      <body className={`${inter.variable} ${jetbrainsMono.variable}`}>
+        <Providers>{children}</Providers>
+      </body>
     </html>
   )
 }

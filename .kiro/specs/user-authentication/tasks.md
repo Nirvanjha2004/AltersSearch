@@ -120,8 +120,8 @@ Implement dual-token JWT authentication across repo-api (Node.js/Express) and th
     - Implement typed `register`, `login`, `refresh`, `logout` wrappers using `fetch` against `NEXT_PUBLIC_API_URL`
     - _Requirements: 6.2, 7.3, 8.3, 4.1_
 
-- [ ] 8. Implement AuthContext and AuthProvider
-  - [ ] 8.1 Create `frontend/src/contexts/AuthContext.tsx` with `AuthProvider` and `useAuth` hook
+- [-] 8. Implement AuthContext and AuthProvider
+  - [x] 8.1 Create `frontend/src/contexts/AuthContext.tsx` with `AuthProvider` and `useAuth` hook
     - On mount: read `auth_refresh_token` from `localStorage`; if present, attempt silent refresh; populate `user` state on success; clear storage on 401
     - Implement `login(email, password)`: call `authApi.login`, store refresh token in `localStorage`, keep access token in React state, set `user`
     - Implement `logout()`: call `authApi.logout`, clear `localStorage` and React state
@@ -133,7 +133,7 @@ Implement dual-token JWT authentication across repo-api (Node.js/Express) and th
     - Unit tests for silent refresh on 401, proactive refresh timer, login/logout state transitions
     - **Validates: Requirements 8.2, 8.3, 8.4, 8.5**
 
-  - [ ] 8.3 Wrap the root layout with `AuthProvider` in `frontend/src/app/layout.tsx`
+  - [x] 8.3 Wrap the root layout with `AuthProvider` in `frontend/src/app/layout.tsx`
     - Add `"use client"` boundary or a thin client wrapper component to host the provider
     - _Requirements: 8.1_
 
