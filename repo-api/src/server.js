@@ -1,6 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
+const authRouter = require("./auth/router.js");
 
 dotenv.config();
 
@@ -12,6 +13,8 @@ const CACHE_TTL_MS = Number(process.env.REPO_CACHE_TTL_MS || 1000 * 60 * 5);
 const cache = new Map();
 
 app.use(cors({ origin: process.env.FRONTEND_ORIGIN || "http://localhost:3000" }));
+
+app.use(authRouter);
 
 function getCacheKey(owner, repo) {
   return `${owner}/${repo}`.toLowerCase();

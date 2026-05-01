@@ -93,13 +93,13 @@ Implement dual-token JWT authentication across repo-api (Node.js/Express) and th
     - **Property 10: Valid tokens always have claims attached to the request** — `middleware.property.test.js`
     - **Validates: Requirements 5.4, 5.5**
 
-- [-] 5. Wire auth router into Express server
-  - [ ] 5.1 Create `repo-api/src/auth/router.js` mounting all four handlers on `/api/auth/*`
+- [x] 5. Wire auth router into Express server
+  - [x] 5.1 Create `repo-api/src/auth/router.js` mounting all four handlers on `/api/auth/*`
     - Add `express.json()` middleware; mount `POST /register`, `POST /login`, `POST /refresh`, `POST /logout`
     - Export the router
     - _Requirements: 1.1, 2.1, 3.1, 4.1_
 
-  - [ ] 5.2 Mount auth router in `repo-api/src/server.js`
+  - [x] 5.2 Mount auth router in `repo-api/src/server.js`
     - `app.use(authRouter)` before existing routes
     - _Requirements: 1.1, 2.1, 3.1, 4.1_
 
