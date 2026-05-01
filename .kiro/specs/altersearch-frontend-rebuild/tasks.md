@@ -165,14 +165,14 @@ Rebuild the AltersSearch frontend using Aceternity UI primitives, updated design
     - Call `onSelect(label)` on click; apply hover state with `--accent` border
     - _Requirements: 7.3, 7.4_
 
-- [-] 9. Create VectorSearchToggle component (`components/VectorSearchToggle.tsx`)
-  - [ ] 9.1 Implement VectorSearchToggle display chip
+- [x] 9. Create VectorSearchToggle component (`components/VectorSearchToggle.tsx`)
+  - [x] 9.1 Implement VectorSearchToggle display chip
     - Render a stateless pill displaying "✦ VECTOR SEARCH"
     - Style with `text-[var(--accent)] border border-[var(--accent)/30] bg-[var(--accent)/10] rounded-full px-3 py-1 text-xs font-medium`
     - _Requirements: 7.6_
 
-- [ ] 10. Create RepoCard component (`components/RepoCard.tsx`)
-  - [ ] 10.1 Implement RepoCard layout and content
+- [-] 10. Create RepoCard component (`components/RepoCard.tsx`)
+  - [x] 10.1 Implement RepoCard layout and content
     - Accept `result: SearchResult` and `index: number` props
     - Render repo name in `font-bold text-[var(--text-primary)]`
     - Render description in `text-[var(--text-muted)] line-clamp-2`
@@ -180,12 +180,12 @@ Rebuild the AltersSearch frontend using Aceternity UI primitives, updated design
     - Render ★ star count, language dot (using `LANG_COLORS` map for TypeScript, JavaScript, Python, Rust, Go, Java, C++, Ruby, Swift, Kotlin), and "View on GitHub →" link opening in a new tab
     - _Requirements: 9.1, 9.2, 9.3, 9.4, 9.5, 9.6_
 
-  - [ ] 10.2 Implement Framer Motion animations on RepoCard
+  - [x] 10.2 Implement Framer Motion animations on RepoCard
     - Wrap card in `<motion.div>` with `initial={{ opacity: 0, y: 20 }}`, `animate={{ opacity: 1, y: 0 }}`, `transition={{ duration: 0.3, delay: index * 0.06 }}`
     - Add `whileHover={{ scale: 1.02, y: -4 }}` with `transition={{ type: "spring", stiffness: 300 }}`
     - _Requirements: 9.8, 10.2_
 
-  - [ ] 10.3 Wrap RepoCard in HoverEffect or BackgroundGradient
+  - [-] 10.3 Wrap RepoCard in HoverEffect or BackgroundGradient
     - Wrap the inner card content in `<BackgroundGradient>` (or `<HoverEffect>`) from `components/ui/`
     - Add `role="button"`, `tabIndex={0}`, and `onKeyDown` handler for Enter/Space to open the GitHub URL
     - _Requirements: 9.7, 12.4_
