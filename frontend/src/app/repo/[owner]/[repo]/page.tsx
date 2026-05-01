@@ -42,9 +42,8 @@ export default function RepoDetailsPage({ params }: RepoPageProps) {
       setError(null);
       try {
         const candidates = [
-          process.env.NEXT_PUBLIC_REPO_API_URL,
+          process.env.NEXT_PUBLIC_API_URL,
           "http://localhost:8000",
-          "http://localhost:4000",
         ].filter(Boolean) as string[];
 
         let lastError: Error | null = null;

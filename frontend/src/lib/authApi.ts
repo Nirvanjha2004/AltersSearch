@@ -2,7 +2,7 @@
  * Typed wrappers for the repo-api authentication endpoints.
  */
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 /**
  * Parses a non-2xx response and throws an error with the message from the JSON body.

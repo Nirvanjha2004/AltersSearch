@@ -6,7 +6,7 @@ const authRouter = require("./auth/router.js");
 dotenv.config();
 
 const app = express();
-const PORT = Number(process.env.PORT || 4000);
+const PORT = Number(process.env.PORT || 8000);
 const GITHUB_API_BASE = "https://api.github.com";
 const CACHE_TTL_MS = Number(process.env.REPO_CACHE_TTL_MS || 1000 * 60 * 5);
 
