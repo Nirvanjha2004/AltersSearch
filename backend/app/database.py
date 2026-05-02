@@ -1,7 +1,9 @@
 import importlib
 import os
+import time
 from typing import Any, Optional
 from app.schemas import SearchResult
+from app.logger import logger
 from dotenv import load_dotenv
 
 # Ye line .env file se variables read karke os.environ mein daal degi
@@ -73,7 +75,11 @@ def vector_search(query_embedding: list[float], domain: str = None) -> list[Sear
     }
 
     # 3. Execute the search
+    start_rpc = time.time()
+    logger.info("Executing Supabase RPC '{}'...", rpc_name)
     response = client.rpc(rpc_name, payload).execute()
+    logger.info("Supabase RPC completed in {:.2f}s", time.time() - start_rpc)
+    
     rows = response.data or []
 
     results: list[SearchResult] = []

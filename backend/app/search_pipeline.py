@@ -2,6 +2,7 @@ import asyncio
 import json
 import os
 import re
+import time
 from functools import lru_cache
 from typing import Any
 
@@ -171,6 +172,7 @@ async def _web_search(query: str, max_results: int = 5) -> list[dict]:
     Fetch web results from Serper.dev API (Google Search).
     Returns list of {title, url, snippet} dicts.
     """
+    start_time = time.time()
     # 1. Update your .env to use SERPER_API_KEY
     api_key = os.getenv("SERPER_API_KEY") or "39f6ab13268ea48e13ddb342180ba99b3e87901c"
     if not api_key:
@@ -204,7 +206,7 @@ async def _web_search(query: str, max_results: int = 5) -> list[dict]:
             # Serper stores results in the 'organic' key
             results = data.get("organic", [])
             
-            return [
+            out = [
                 {
                     "title": r.get("title", ""),
                     "url": r.get("link", ""),     # Serper uses 'link'
@@ -212,8 +214,10 @@ async def _web_search(query: str, max_results: int = 5) -> list[dict]:
                 }
                 for r in results
             ]
+            logger.info("web_search completed in {:.2f}s", time.time() - start_time)
+            return out
         except Exception:
-            logger.exception("Serper API call failed for query='{}'", query)
+            logger.exception("Serper API call failed for query='{}'. Took {:.2f}s", query, time.time() - start_time)
             return []
 
 async def _synthesize_web_results(query: str, results: list[dict]) -> str:
@@ -221,6 +225,7 @@ async def _synthesize_web_results(query: str, results: list[dict]) -> str:
     if not results:
         return "No web results found for this query."
 
+    start_time = time.time()
     results_text = "\n\n".join(
         f"[{i+1}] {r['title']}\nURL: {r['url']}\n{r['snippet']}"
         for i, r in enumerate(results)
@@ -234,9 +239,10 @@ async def _synthesize_web_results(query: str, results: list[dict]) -> str:
 
     try:
         response = await llm.ainvoke(messages)
+        logger.info("_synthesize_web_results completed in {:.2f}s", time.time() - start_time)
         return response.content.strip()
     except Exception:
-        logger.exception("Web result synthesis failed")
+        logger.exception("Web result synthesis failed. Took {:.2f}s", time.time() - start_time)
         return "\n\n".join(
             f"**{r['title']}**\n{r['snippet']}\n{r['url']}" for r in results[:3]
         )
@@ -295,6 +301,7 @@ async def _enrich_query_with_web_context(
 
     Falls back to gatekeeper_optimized if anything fails.
     """
+    start_time = time.time()
     entity = _extract_core_entity(original_query)
     lookup_query = f"what is {entity}"
 
@@ -324,12 +331,12 @@ async def _enrich_query_with_web_context(
         if not enriched:
             raise ValueError("Empty enrichment output")
         logger.info(
-            "Enrichment complete original='{}' enriched='{}'",
-            original_query, enriched,
+            "Enrichment complete original='{}' enriched='{}'. Took {:.2f}s",
+            original_query, enriched, time.time() - start_time,
         )
         return enriched
     except Exception:
-        logger.exception("Enrichment LLM call failed — falling back to gatekeeper query.")
+        logger.exception("Enrichment LLM call failed — falling back to gatekeeper query. Took {:.2f}s", time.time() - start_time)
         return gatekeeper_optimized
 
 
@@ -338,6 +345,7 @@ async def _enrich_query_with_web_context(
 # ---------------------------------------------------------------------------
 
 async def _embed_text(text: str) -> list[float]:
+    start_time = time.time()
     model = _get_embeddings_model()
     if hasattr(model, "embed_query"):
         vector = await asyncio.to_thread(model.embed_query, text)
@@ -346,6 +354,7 @@ async def _embed_text(text: str) -> list[float]:
         vector = raw.tolist() if hasattr(raw, "tolist") else list(raw)
     else:
         raise RuntimeError("Embeddings model has no supported method.")
+    logger.info("_embed_text completed in {:.2f}s", time.time() - start_time)
     return list(vector)
 
 
@@ -365,6 +374,7 @@ def _extract_clarification_fragment(query: str) -> str:
 
 
 async def _run_gatekeeper(query: str) -> GatekeeperDecision:
+    start_time = time.time()
     gatekeeper = _get_gatekeeper_llm()
     messages = [
         SystemMessage(content=GATEKEEPER_SYSTEM_PROMPT),
@@ -383,9 +393,10 @@ async def _run_gatekeeper(query: str) -> GatekeeperDecision:
             decision.clarification_question = ""
             decision.needs_enrichment = False
 
+        logger.info("_run_gatekeeper completed in {:.2f}s", time.time() - start_time)
         return decision
     except Exception:
-        logger.exception("Gatekeeper LLM failed for query='{}'. Using fallback.", query)
+        logger.exception("Gatekeeper LLM failed for query='{}'. Using fallback. Took {:.2f}s", query, time.time() - start_time)
         return GatekeeperDecision(
             action="vector_search",
             optimized_query=query,
@@ -416,6 +427,7 @@ async def process_search_query(request: SearchRequest) -> dict[str, Any]:
             ii. Embed the (possibly enriched) query.
             iii. MongoDB vector search → return repos.
     """
+    start_total = time.time()
     query = request.query.strip()
     logger.info("process_search_query started query='{}'", query)
 
@@ -429,6 +441,7 @@ async def process_search_query(request: SearchRequest) -> dict[str, Any]:
 
     # ── Step 2a: Clarification ─────────────────────────────────────────────
     if decision.action == "clarify":
+        logger.info("process_search_query finished (clarify) in {:.2f}s", time.time() - start_total)
         return {
             "status": "clarification_needed",
             "action": "clarify",
@@ -452,6 +465,7 @@ async def process_search_query(request: SearchRequest) -> dict[str, Any]:
             answer = await _synthesize_web_results(optimized_query, raw_results)
             ui_results = _normalize_web_results_for_ui(raw_results)
             logger.info("Web search completed result_count={}", len(raw_results))
+            logger.info("process_search_query finished (web_search) in {:.2f}s", time.time() - start_total)
             return {
                 "status": "success",
                 "action": "web_search",
@@ -485,8 +499,19 @@ async def process_search_query(request: SearchRequest) -> dict[str, Any]:
 
         embedding = await _embed_text(optimized_query)
         logger.debug("Embedding dimension={}", len(embedding))
-        results = await asyncio.to_thread(vector_search, query_embedding=embedding)
-        logger.info("Vector search done result_count={}", len(results))
+        
+        start_vs = time.time()
+        try:
+            results = await asyncio.wait_for(
+                asyncio.to_thread(vector_search, query_embedding=embedding),
+                timeout=15.0
+            )
+            logger.info("Vector DB search done in {:.2f}s, result_count={}", time.time() - start_vs, len(results))
+        except asyncio.TimeoutError:
+            logger.error("Vector DB search timed out after 15.0s!")
+            raise
+
+        logger.info("process_search_query finished (vector_search) in {:.2f}s", time.time() - start_total)
         return {
             "status": "success",
             "action": "vector_search",
