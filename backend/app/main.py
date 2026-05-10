@@ -16,6 +16,15 @@ from app.auth import router as auth_router
 app = FastAPI(title="Open Source Search API")
 GITHUB_API_BASE = "https://api.github.com"
 
+# Validate required env vars at startup so missing config fails loudly
+_REQUIRED_ENV_VARS = ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"]
+
+@app.on_event("startup")
+async def validate_env():
+    missing = [v for v in _REQUIRED_ENV_VARS if not os.getenv(v)]
+    if missing:
+        raise RuntimeError(f"Missing required environment variables: {', '.join(missing)}")
+
 # Allow the local Next.js frontend during development.
 app.add_middleware(
 	CORSMiddleware,

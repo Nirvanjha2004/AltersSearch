@@ -3,24 +3,16 @@ import time
 from typing import Any
 from dotenv import load_dotenv
 import os
-from langchain_huggingface import HuggingFaceEmbeddings
 
 load_dotenv()
 
 import httpx
 from supabase import acreate_client
 from loguru import logger
+from app.embeddings import embed_texts
 
 
 GITHUB_SEARCH_URL = "https://api.github.com/search/repositories"
-
-
-def _get_embeddings_model():
-    """
-    Returns a local HuggingFace embedding model (384 dimensions).
-    Runs 100% locally. Zero API keys. Zero rate limits.
-    """
-    return HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
 
 
 def _infer_domain(query: str, repo: dict[str, Any]) -> str:
@@ -86,21 +78,6 @@ async def _fetch_repositories_page(
         return []
 
     return items
-
-
-async def _embed_texts(model, texts: list[str]) -> list[list[float]]:
-    if not texts:
-        return []
-
-    if hasattr(model, "aembed_documents"):
-        vectors = await model.aembed_documents(texts)
-        return [list(map(float, vector)) for vector in vectors]
-
-    if hasattr(model, "embed_documents"):
-        vectors = model.embed_documents(texts)
-        return [list(map(float, vector)) for vector in vectors]
-
-    raise RuntimeError("No supported embedding method found on the embeddings model.")
 
 
 def _safe_str(value: Any) -> str | None:
@@ -295,8 +272,7 @@ async def _process_job(supabase, client: httpx.AsyncClient, job: dict[str, Any])
     )
 
     texts = [_build_embedding_text(repo) for repo in repos]
-    embeddings_model = _get_embeddings_model()
-    vectors = await _embed_texts(model=embeddings_model, texts=texts)
+    vectors = await embed_texts(texts)
 
     for repo, embedding_vector in zip(repos, vectors):
         repo_name = repo.get("full_name") or repo.get("name") or "unknown"

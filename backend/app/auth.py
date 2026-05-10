@@ -20,9 +20,6 @@ from typing import Optional
 import httpx
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, EmailStr
-from dotenv import load_dotenv
-
-load_dotenv()
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -124,20 +121,27 @@ async def register(body: RegisterRequest):
             },
         )
 
+    def _get_json_safe(response):
+        """Safely parse JSON response, return empty dict if body is empty."""
+        try:
+            return response.json() if response.content else {}
+        except Exception:
+            return {}
+
     if resp.status_code == 422:
         # Supabase returns 422 for duplicate email via admin API
-        data = resp.json()
+        data = _get_json_safe(resp)
         msg = data.get("msg") or data.get("message") or ""
         if "already" in msg.lower() or "registered" in msg.lower() or "exists" in msg.lower():
             raise HTTPException(status_code=409, detail="Email already registered.")
         raise HTTPException(status_code=400, detail=msg or "Invalid registration data.")
 
     if resp.status_code not in (200, 201):
-        data = resp.json()
+        data = _get_json_safe(resp)
         msg = data.get("msg") or data.get("message") or data.get("error_description") or "Registration failed."
         raise HTTPException(status_code=500, detail=msg)
 
-    data = resp.json()
+    data = _get_json_safe(resp)
     user_id = data.get("id")
     user_email = data.get("email")
 
@@ -159,15 +163,22 @@ async def login(body: LoginRequest):
             json={"email": body.email, "password": body.password},
         )
 
+    def _get_json_safe(response):
+        """Safely parse JSON response, return empty dict if body is empty."""
+        try:
+            return response.json() if response.content else {}
+        except Exception:
+            return {}
+
     if resp.status_code == 400:
         raise HTTPException(status_code=401, detail="Invalid credentials.")
 
     if not resp.is_success:
-        data = resp.json()
+        data = _get_json_safe(resp)
         msg = data.get("error_description") or data.get("message") or "Login failed."
         raise HTTPException(status_code=401, detail=msg)
 
-    data = resp.json()
+    data = _get_json_safe(resp)
     access_token = data.get("access_token")
     refresh_token = data.get("refresh_token")
 
@@ -189,10 +200,17 @@ async def refresh_token(body: RefreshRequest):
             json={"refresh_token": body.refreshToken},
         )
 
+    def _get_json_safe(response):
+        """Safely parse JSON response, return empty dict if body is empty."""
+        try:
+            return response.json() if response.content else {}
+        except Exception:
+            return {}
+
     if not resp.is_success:
         raise HTTPException(status_code=401, detail="Invalid or expired refresh token.")
 
-    data = resp.json()
+    data = _get_json_safe(resp)
     access_token = data.get("access_token")
     new_refresh_token = data.get("refresh_token")
 
@@ -210,6 +228,13 @@ async def logout(body: LogoutRequest):
     Calls the Supabase logout endpoint if a refresh token is provided.
     Always returns 200 — logout is idempotent.
     """
+    def _get_json_safe(response):
+        """Safely parse JSON response, return empty dict if body is empty."""
+        try:
+            return response.json() if response.content else {}
+        except Exception:
+            return {}
+
     if body.refreshToken:
         # First exchange the refresh token to get an access token to revoke
         url = f"{_supabase_url()}/auth/v1/logout"
@@ -223,7 +248,7 @@ async def logout(body: LogoutRequest):
                     json={"refresh_token": body.refreshToken},
                 )
                 if refresh_resp.is_success:
-                    access_token = refresh_resp.json().get("access_token", "")
+                    access_token = _get_json_safe(refresh_resp).get("access_token", "")
                     if access_token:
                         await client.post(
                             url,

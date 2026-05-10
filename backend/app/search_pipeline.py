@@ -1,5 +1,4 @@
 import asyncio
-import json
 import os
 import re
 import time
@@ -8,11 +7,11 @@ from typing import Any
 
 import httpx
 from langchain_core.messages import HumanMessage, SystemMessage
-from langchain_groq import ChatGroq
-from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_google_genai import ChatGoogleGenerativeAI
 from pydantic import BaseModel, Field
 
 from app.database import vector_search
+from app.embeddings import embed_query
 from app.logger import logger
 from app.schemas import SearchRequest
 
@@ -126,9 +125,9 @@ class GatekeeperDecision(BaseModel):
 
 @lru_cache(maxsize=1)
 def _get_gatekeeper_llm():
-    llm = ChatGroq(
-        model=os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),
-        api_key=os.getenv("GROQ_API_KEY"),
+    llm = ChatGoogleGenerativeAI(
+        model="gemini-2.5-flash",
+        google_api_key=os.getenv("GOOGLE_API_KEY"),
         temperature=0,
         max_tokens=300,
     )
@@ -138,9 +137,9 @@ def _get_gatekeeper_llm():
 @lru_cache(maxsize=1)
 def _get_synthesis_llm():
     """Separate LLM instance for synthesizing web search results (no structured output)."""
-    return ChatGroq(
-        model=os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),
-        api_key=os.getenv("GROQ_API_KEY"),
+    return ChatGoogleGenerativeAI(
+        model="gemini-2.5-flash",
+        google_api_key=os.getenv("GOOGLE_API_KEY"),
         temperature=0.3,
         max_tokens=400,
     )
@@ -149,18 +148,12 @@ def _get_synthesis_llm():
 @lru_cache(maxsize=1)
 def _get_enrichment_llm():
     """Lightweight LLM call: just outputs one enriched query string."""
-    return ChatGroq(
-        model=os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),
-        api_key=os.getenv("GROQ_API_KEY"),
+    return ChatGoogleGenerativeAI(
+        model="gemini-2.5-flash",
+        google_api_key=os.getenv("GOOGLE_API_KEY"),
         temperature=0,
-        max_tokens=80,  # one line output → keep cheap
+        max_tokens=80,
     )
-
-
-@lru_cache(maxsize=1)
-def _get_embeddings_model() -> HuggingFaceEmbeddings:
-    model_name = os.getenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
-    return HuggingFaceEmbeddings(model_name=model_name)
 
 
 # ---------------------------------------------------------------------------
@@ -345,17 +338,8 @@ async def _enrich_query_with_web_context(
 # ---------------------------------------------------------------------------
 
 async def _embed_text(text: str) -> list[float]:
-    start_time = time.time()
-    model = _get_embeddings_model()
-    if hasattr(model, "embed_query"):
-        vector = await asyncio.to_thread(model.embed_query, text)
-    elif hasattr(model, "encode"):
-        raw = await asyncio.to_thread(model.encode, text)
-        vector = raw.tolist() if hasattr(raw, "tolist") else list(raw)
-    else:
-        raise RuntimeError("Embeddings model has no supported method.")
-    logger.info("_embed_text completed in {:.2f}s", time.time() - start_time)
-    return list(vector)
+    """Embed a query using Jina AI (retrieval.query task)."""
+    return await embed_query(text)
 
 
 # ---------------------------------------------------------------------------
@@ -504,11 +488,11 @@ async def process_search_query(request: SearchRequest) -> dict[str, Any]:
         try:
             results = await asyncio.wait_for(
                 asyncio.to_thread(vector_search, query_embedding=embedding),
-                timeout=15.0
+                timeout=30.0
             )
             logger.info("Vector DB search done in {:.2f}s, result_count={}", time.time() - start_vs, len(results))
         except asyncio.TimeoutError:
-            logger.error("Vector DB search timed out after 15.0s!")
+            logger.error("Vector DB search timed out after 30.0s!")
             raise
 
         logger.info("process_search_query finished (vector_search) in {:.2f}s", time.time() - start_total)
