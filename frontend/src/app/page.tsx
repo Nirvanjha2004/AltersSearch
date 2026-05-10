@@ -1,16 +1,14 @@
 "use client";
 
-import { useRef, useState, useCallback } from "react";
+import { useRef, useState, useCallback, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import {
-  ArrowUp,
-  Sparkles,
-} from "lucide-react";
+import { ArrowUp, Sparkles } from "lucide-react";
 import Sidebar, { type ChatItem } from "../components/Sidebar";
 import { ResultsGrid } from "../components/ResultsGrid";
 import SearchChips from "../components/SearchChips";
 import ProtectedRoute from "../components/ProtectedRoute";
 import { useAuth } from "../contexts/AuthContext";
+import * as historyApi from "../lib/historyApi";
 import type { AgentResponse, SearchResult } from "../types";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -42,7 +40,7 @@ function getFirstName(email: string): string {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function SearchPage() {
-  const { user } = useAuth();
+  const { user, accessToken } = useAuth();
 
   // ── Sidebar state ──────────────────────────────────────────────────────
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -50,17 +48,31 @@ export default function SearchPage() {
   const [activeChatId, setActiveChatId] = useState<string | undefined>();
 
   // ── Search state ───────────────────────────────────────────────────────
-  const [inputValue, setInputValue]   = useState("");
-  const [results, setResults]         = useState<SearchResult[]>([]);
-  const [isLoading, setIsLoading]     = useState(false);
-  const [error, setError]             = useState<string | null>(null);
-  const [viewState, setViewState]     = useState<"empty" | "loading" | "results">("empty");
+  const [inputValue, setInputValue]       = useState("");
+  const [results, setResults]             = useState<SearchResult[]>([]);
+  const [isLoading, setIsLoading]         = useState(false);
+  const [error, setError]                 = useState<string | null>(null);
+  const [viewState, setViewState]         = useState<"empty" | "loading" | "results">("empty");
   const [clarification, setClarification] = useState<string | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  // ── Sidebar width for main-content offset ──────────────────────────────
   const sidebarW = sidebarCollapsed ? SIDEBAR_COLLAPSED : SIDEBAR_EXPANDED;
+
+  // ── Load chat history on mount (once token is available) ───────────────
+  useEffect(() => {
+    if (!accessToken) return;
+
+    setHistoryLoading(true);
+    historyApi.listSessions(accessToken)
+      .then((sessions) => {
+        setChats(sessions.map((s) => ({ id: s.id, title: s.title })));
+      })
+      .catch(() => {
+        // Non-fatal — history just won't show
+      })
+      .finally(() => setHistoryLoading(false));
+  }, [accessToken]);
 
   // ── Auto-resize textarea ───────────────────────────────────────────────
   const autoResize = () => {
@@ -70,9 +82,11 @@ export default function SearchPage() {
     el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
   };
 
-  // ── Search ─────────────────────────────────────────────────────────────
-  // Core search — adds to chat list ONLY on success
-  const runSearch = useCallback(async (query: string, chatId?: string) => {
+  // ── Core search ────────────────────────────────────────────────────────
+  const runSearch = useCallback(async (
+    query: string,
+    opts?: { sessionId?: string; isNew?: boolean }
+  ) => {
     setError(null);
     setClarification(null);
     setIsLoading(true);
@@ -91,7 +105,6 @@ export default function SearchPage() {
       const data = (await res.json()) as AgentResponse;
 
       if (data.status === "clarification_needed") {
-        // Don't add to chat list — still waiting for a real result
         setClarification(data.clarification_question ?? data.message ?? null);
         setResults([]);
         setViewState("empty");
@@ -104,15 +117,44 @@ export default function SearchPage() {
         return;
       }
 
-      // Success — now add/confirm the chat entry
-      if (chatId) {
-        // New search: add the entry now that we have results
+      // ── Success ──────────────────────────────────────────────────────
+      const searchResults = data.results ?? [];
+      setResults(searchResults);
+      setViewState("results");
+
+      // Persist to DB (fire-and-forget, non-blocking)
+      if (accessToken) {
+        void (async () => {
+          try {
+            let sessionId = opts?.sessionId;
+
+            if (opts?.isNew || !sessionId) {
+              // Create a new session with the query as title
+              const session = await historyApi.createSession(accessToken, query);
+              sessionId = session.id;
+              setChats((prev) => [{ id: session.id, title: session.title }, ...prev].slice(0, 50));
+              setActiveChatId(session.id);
+            }
+
+            if (sessionId) {
+              await historyApi.addMessage(accessToken, sessionId, {
+                query,
+                results: searchResults,
+                answer: data.answer ?? null,
+                action: data.action ?? null,
+              });
+            }
+          } catch {
+            // History save failed — search result is still shown, just not persisted
+          }
+        })();
+      } else if (opts?.isNew) {
+        // Not logged in or no token yet — fall back to in-memory only
+        const chatId = `local-${Date.now()}`;
         setChats((prev) => [{ id: chatId, title: query }, ...prev].slice(0, 20));
         setActiveChatId(chatId);
       }
 
-      setResults(data.results ?? []);
-      setViewState("results");
     } catch (err) {
       setError(
         err instanceof Error
@@ -124,18 +166,17 @@ export default function SearchPage() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [accessToken]);
 
-  // New search from input — generates a chat ID and passes it to runSearch
+  // ── New search from input ──────────────────────────────────────────────
   const handleSearch = useCallback(async (q: string) => {
     const query = q.trim();
     if (!query) return;
-    const chatId = `chat-${Date.now()}`;
-    await runSearch(query, chatId);
+    await runSearch(query, { isNew: true });
   }, [runSearch]);
 
   const handleSubmit = () => {
-    if (inputValue.trim()) handleSearch(inputValue);
+    if (inputValue.trim()) void handleSearch(inputValue);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -155,14 +196,43 @@ export default function SearchPage() {
     setTimeout(() => textareaRef.current?.focus(), 80);
   };
 
-  const handleSelectChat = (id: string) => {
+  // ── Select a past chat — load its messages from DB ─────────────────────
+  const handleSelectChat = useCallback(async (id: string) => {
     setActiveChatId(id);
     const chat = chats.find((c) => c.id === id);
-    if (chat) {
+    if (!chat) return;
+
+    // If it's a local (non-persisted) chat, just re-run the search
+    if (id.startsWith("local-")) {
       setInputValue(chat.title);
-      void runSearch(chat.title);
+      void runSearch(chat.title, { sessionId: id });
+      return;
     }
-  };
+
+    // Load messages from DB
+    if (!accessToken) return;
+    setIsLoading(true);
+    setViewState("loading");
+    setInputValue(chat.title);
+
+    try {
+      const messages = await historyApi.listMessages(accessToken, id);
+      if (messages.length > 0) {
+        // Show the last message's results
+        const last = messages[messages.length - 1];
+        setResults(last.results ?? []);
+        setViewState(last.results && last.results.length > 0 ? "results" : "empty");
+      } else {
+        // Session exists but no messages — re-run the search
+        void runSearch(chat.title, { sessionId: id });
+      }
+    } catch {
+      // Fallback: re-run the search
+      void runSearch(chat.title, { sessionId: id });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [accessToken, chats, runSearch]);
 
   // ── Render ─────────────────────────────────────────────────────────────
   const greeting  = getGreeting();
@@ -182,7 +252,7 @@ export default function SearchPage() {
           onCollapsedChange={setSidebarCollapsed}
         />
 
-        {/* ── Main content — offset tracks sidebar width ──────────────── */}
+        {/* ── Main content ────────────────────────────────────────────── */}
         <motion.div
           className="main-content"
           animate={{ marginLeft: sidebarW }}

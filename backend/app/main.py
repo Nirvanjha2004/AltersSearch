@@ -11,6 +11,7 @@ from app.logger import logger
 from app.search_pipeline import process_search_query
 from app.schemas import SearchRequest
 from app.auth import router as auth_router
+from app.history import router as history_router
 
 
 app = FastAPI(title="Open Source Search API")
@@ -35,6 +36,7 @@ app.add_middleware(
 )
 
 app.include_router(auth_router)
+app.include_router(history_router)
 
 
 @app.post("/api/search")
