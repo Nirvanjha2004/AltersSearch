@@ -12,9 +12,9 @@ Key capabilities:
 
 - Natural language → GitHub repository search
 - AI query routing (vector search vs. web search vs. clarification)
-- Supabase pgvector semantic index over ingested repositories
+- Supabase pgvector semantic index over ingested repositories (1024-dimensional Jina embeddings)
 - Supabase Auth for user registration and login
-- Collapsible sidebar with chat history (searches saved per session)
+- Collapsible sidebar with persistent chat history (sessions saved per user in Supabase)
 - Smart search chips — pre-built developer-focused query shortcuts
 - Repository detail pages with README, languages, and contributors
 - Dark, minimal premium UI inspired by Claude and Linear
@@ -43,7 +43,7 @@ Key capabilities:
 | Framework | FastAPI + Uvicorn |
 | Validation | Pydantic v2 |
 | LLM routing | LangChain + Groq (`llama-3.3-70b-versatile`) |
-| Embeddings | `sentence-transformers` (`all-MiniLM-L6-v2`) |
+| Embeddings | Jina AI `jina-embeddings-v3` (1024d) |
 | Vector DB | Supabase Postgres + pgvector |
 | Auth provider | Supabase Auth (Admin API) |
 | HTTP client | httpx |
@@ -51,7 +51,8 @@ Key capabilities:
 
 ### Supporting Services
 
-- **Supabase** — Postgres database, pgvector index, and Auth
+- **Supabase** — Postgres database, pgvector index, Auth, and Row-Level Security
+- **Jina AI** — `jina-embeddings-v3` embeddings (free tier: 1M tokens, no rate limits)
 - **Serper.dev** — Google Search API for live web enrichment
 - **GitHub REST API** — repository metadata, README, contributors, languages
 - **Docker + Docker Compose** — local and production orchestration
@@ -78,11 +79,12 @@ alterssearch/
 │   │   │   ├── SkeletonCard.tsx    # Loading placeholder
 │   │   │   └── repo-detail/        # Repo detail sub-components
 │   │   ├── contexts/
-│   │   │   └── AuthContext.tsx     # Auth state + token refresh
+│   │   │   └── AuthContext.tsx     # Auth state + proactive token refresh
 │   │   ├── hooks/
 │   │   │   └── useSearchSuggestions.ts  # Smart chip query mappings
 │   │   ├── lib/
 │   │   │   ├── authApi.ts          # Auth API wrappers
+│   │   │   ├── historyApi.ts       # Chat history API wrappers
 │   │   │   ├── cn.ts               # clsx + tailwind-merge utility
 │   │   │   └── tokenUtils.ts       # JWT decode helpers
 │   │   └── types/index.ts          # Shared TypeScript types
@@ -91,24 +93,24 @@ alterssearch/
 │
 ├── backend/                # FastAPI backend
 │   ├── app/
-│   │   ├── main.py             # API routes + CORS + auth router
+│   │   ├── main.py             # API routes + CORS + routers
 │   │   ├── auth.py             # /api/auth/* routes (Supabase Admin API)
+│   │   ├── history.py          # /api/history/* routes (chat sessions + messages)
 │   │   ├── search_pipeline.py  # Query routing, web search, LLM synthesis
 │   │   ├── database.py         # Supabase pgvector retrieval
+│   │   ├── embeddings.py       # Jina AI embedding client
 │   │   ├── schemas.py          # Pydantic request/response models
-│   │   ├── agent.py            # LangChain agent logic
+│   │   ├── agent.py            # LangChain agent + gatekeeper logic
 │   │   ├── config.py           # Environment config
 │   │   └── logger.py           # Loguru setup
 │   ├── workers/
-│   │   └── github_ingest.py    # Repo ingestion + embedding worker
+│   │   ├── github_ingest.py    # Repo ingestion + embedding worker
+│   │   └── reembed.py          # Re-embed all repos after dimension migration
 │   ├── supabase/
-│   │   └── migrations/         # SQL schema migrations
+│   │   └── migrations/         # SQL schema migrations (run in order)
 │   ├── requirements.txt
 │   ├── Dockerfile
 │   └── .env                    # Local secrets (never commit)
-│
-├── repo-api/               # Express repo metadata helper (optional)
-│   └── src/server.js
 │
 ├── docker-compose.yml
 └── README.md
@@ -141,6 +143,7 @@ The UI uses a dark, minimal premium aesthetic with these tokens (defined in `glo
 - Python 3.11+
 - A Supabase project (free tier works)
 - A Groq API key (free at [console.groq.com](https://console.groq.com))
+- A Jina AI API key (free at [jina.ai](https://jina.ai) — 1M tokens, no credit card)
 - Optional: Serper.dev API key for live web search
 
 ### 1. Clone and configure
@@ -163,9 +166,9 @@ cp frontend/.env.local.example frontend/.env.local
 GROQ_API_KEY=your_groq_key
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+JINA_API_KEY=your_jina_key              # required for embeddings
 GITHUB_TOKEN=your_github_token          # optional but recommended
 SERPER_API_KEY=your_serper_key          # optional, enables web search
-EMBEDDING_MODEL=all-MiniLM-L6-v2
 ```
 
 **`frontend/.env.local`** — required variables:
@@ -258,6 +261,18 @@ GET /api/repo/{owner}/{repo}
 
 Returns: `{ repo, languages, contributors, readme }`
 
+### Chat history endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/history/sessions` | List all sessions for the authenticated user |
+| `POST` | `/api/history/sessions` | Create a new session. Body: `{ title }` |
+| `GET` | `/api/history/sessions/{id}/messages` | List messages in a session |
+| `POST` | `/api/history/sessions/{id}/messages` | Add a message. Body: `{ query, results, answer, action }` |
+| `DELETE` | `/api/history/sessions/{id}` | Delete a session and all its messages |
+
+All history endpoints require a `Bearer <accessToken>` header.
+
 ---
 
 ## Deploying the Backend
@@ -297,7 +312,7 @@ curl -L https://fly.io/install.sh | sh
 
 cd backend
 fly launch          # detects Dockerfile, creates fly.toml
-fly secrets set GROQ_API_KEY=... SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=...
+fly secrets set GROQ_API_KEY=... SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... JINA_API_KEY=...
 fly deploy
 ```
 
@@ -317,7 +332,7 @@ gcloud run deploy alterssearch-backend \
   --platform managed \
   --region us-central1 \
   --allow-unauthenticated \
-  --set-env-vars GROQ_API_KEY=...,SUPABASE_URL=...
+  --set-env-vars GROQ_API_KEY=...,SUPABASE_URL=...,JINA_API_KEY=...
 ```
 
 Cost: first 2M requests/month free, then ~$0.40 per million.
@@ -369,9 +384,9 @@ Alternatively use Netlify, Cloudflare Pages, or any platform that supports Next.
 | `GROQ_API_KEY` | ✅ | LLM routing and synthesis |
 | `SUPABASE_URL` | ✅ | Supabase project URL |
 | `SUPABASE_SERVICE_ROLE_KEY` | ✅ | Supabase service role key (bypasses RLS) |
+| `JINA_API_KEY` | ✅ | Jina AI embeddings (free at jina.ai — 1M tokens) |
 | `GITHUB_TOKEN` | Recommended | Raises GitHub API rate limit from 60 to 5000 req/hr |
 | `SERPER_API_KEY` | Optional | Enables live Google web search |
-| `EMBEDDING_MODEL` | Optional | Defaults to `all-MiniLM-L6-v2` |
 | `GROQ_MODEL` | Optional | Defaults to `llama-3.3-70b-versatile` |
 | `SUPABASE_VECTOR_SEARCH_RPC` | Optional | Defaults to `match_repos_vector` |
 | `VECTOR_MATCH_COUNT` | Optional | Number of vector results, defaults to `12` |
@@ -388,14 +403,18 @@ Alternatively use Netlify, Cloudflare Pages, or any platform that supports Next.
 
 1. Create a Supabase project at [supabase.com](https://supabase.com)
 2. Enable the `pgvector` extension: **Database → Extensions → vector**
-3. Run the migrations in order:
+3. Run the migrations in order from the Supabase SQL editor:
 
-```bash
-# In the Supabase SQL editor, run each file in order:
+```
 backend/supabase/migrations/20260423000000_init_schema.sql
 backend/supabase/migrations/20260424130000_fix_match_repos_rpc.sql
 backend/supabase/migrations/20260424133000_resolve_match_repos_overload.sql
+backend/supabase/migrations/20260510000000_update_embedding_dim_768.sql
+backend/supabase/migrations/20260510000001_update_embedding_dim_1024.sql
+backend/supabase/migrations/20260510000002_chat_history.sql
 ```
+
+> **Note:** Migrations `_768` and `_1024` evolve the embedding column dimension. The final schema uses 1024-dimensional vectors (Jina AI). If you're setting up fresh, you can run all migrations in sequence — each is idempotent.
 
 4. Copy your **Project URL** and **service_role key** from **Settings → API** into `backend/.env`
 
@@ -407,14 +426,29 @@ The worker at `backend/workers/github_ingest.py` fetches repos from GitHub, gene
 
 ```bash
 cd backend
-python workers/github_ingest.py
+python -m workers.github_ingest
 ```
 
 The worker:
-- Polls the `ingestion_queue` table in Supabase
-- Fetches repo metadata from the GitHub Search API
-- Generates 384-dimensional embeddings using `all-MiniLM-L6-v2`
-- Upserts metadata + vector into the `repos` table
+- Polls the `ingestion_queue` table in Supabase for pending jobs
+- Fetches repo metadata from the GitHub Search API (paginated, sorted by stars)
+- Generates 1024-dimensional embeddings using Jina AI `jina-embeddings-v3`
+- Upserts metadata + vector into the `repos` table (safe to re-run)
+- Retries failed batches up to 3 times with exponential backoff
+
+### Re-embedding after a migration
+
+If you've applied a new embedding dimension migration, run the re-embed worker to backfill existing rows:
+
+```bash
+cd backend
+python -m workers.reembed
+```
+
+This worker:
+- Skips rows that already have embeddings (safe to interrupt and re-run)
+- Processes in batches of 100 with up to 5 retries per batch
+- Logs progress, rate (repos/s), and ETA
 
 ---
 
