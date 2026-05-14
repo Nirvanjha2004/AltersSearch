@@ -29,7 +29,7 @@ async def validate_env():
 # Allow the local Next.js frontend during development.
 app.add_middleware(
 	CORSMiddleware,
-	allow_origins=["http://localhost:3000", "https://alters-search.vercel.app"],
+	allow_origins=["http://localhost:3000", "https://alters-search.vercel.app", "https://altersearch.nirvan.dev"],
 	allow_credentials=True,
 	allow_methods=["*"],
 	allow_headers=["*"],
